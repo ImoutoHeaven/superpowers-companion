@@ -38,7 +38,7 @@ If the main agent is compacted and loses loaded-skill memory, it must re-invoke 
 
 When prompting subagents, you must also remind them that if they are interrupted for compaction, they must add `##Original MainAgentPrompt` and copy your latest prompt verbatim into that section.
 
-Subagents must also be told that if they are compacted and lose loaded-skill memory, they must re-invoke the workflow skill required for their role before resuming. If they are executing a `start-action` controlled workflow, that means re-invoking `start-action` plus any still-required companion skills for that role.
+Subagents must also be told that if they are compacted and lose loaded-skill memory, they must re-invoke only the workflow skill(s) required for their current role before resuming. Re-invoke `start-action` only when the subagent's current role is the workflow controller or another role that explicitly requires `start-action`.
 
 ## Core Rules
 
@@ -181,7 +181,7 @@ Every subagent prompt must include this explicit compaction-preservation instruc
 
 Every subagent prompt must also include one explicit compaction-resume instruction:
 
-`If you are compacted and lose loaded-skill memory, re-invoke the workflow skill(s) required for your current role before resuming. In this workflow, re-invoke start-action when it is part of your current role requirements.`
+`If you are compacted and lose loaded-skill memory, re-invoke only the workflow skill(s) required for your current role before resuming. Do not re-invoke start-action unless your current role explicitly requires the workflow-controller skill.`
 
 ## Reviewer Prompt Contract
 
