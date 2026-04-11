@@ -7,7 +7,7 @@ description: Use when a final conversation summary or design recap must become c
 
 ## Overview
 
-Turn the last approved summary or design recap into two on-disk documents: a converged spec first, then an implementation plan written from the frozen spec. Do not reopen brainstorming. Do not leave optional wording. Use one persistent reviewer session for the spec and one persistent reviewer session for the plan until each passes.
+Turn the last approved summary or design recap into two on-disk documents in two locked phases: converge the spec first, freeze it, re-read the frozen spec fresh, then derive and converge the implementation plan from that immutable spec. Do not reopen brainstorming. Do not leave optional wording. Use one persistent reviewer session for the spec and one persistent reviewer session for the plan until each passes.
 
 ## When to Use
 
@@ -26,14 +26,17 @@ Do not use this skill when the design is still unsettled. That is a brainstormin
 ## Core Rules
 
 1. The final recap is the starting truth. If earlier messages conflict with it, resolve the conflict explicitly in the spec instead of leaving it vague.
-2. Write the spec first. The plan depends on the converged spec.
+2. Write the spec first. Do not draft, outline, or derive any part of the plan until the spec reviewer returns `PASS`, the spec is frozen, and you have re-read the frozen spec fresh.
 3. The spec reviewer is one fresh reviewer session reused with the same `task_id` until `PASS`.
-4. The plan reviewer is one fresh reviewer session reused with the same `task_id` until `PASS`.
-5. Every reviewer message must restate full context because reviewer memory can compact away.
-6. Every review round must re-read the current spec or plan file fresh.
-7. Remove all `optional` / `可选` / `可做可不做` wording. Replace it with a requirement, non-goal, or locked assumption.
-8. Once the spec passes, it becomes immutable. Do not edit it while writing or fixing the plan.
-9. Final reporting must include the absolute spec path and the absolute plan path.
+4. Until the spec reviewer returns `PASS`, the spec is still a mutable draft. The spec reviewer must treat it as editable and not yet immutable.
+5. The plan reviewer is one fresh reviewer session reused with the same `task_id` until `PASS`.
+6. Every reviewer message must restate full context because reviewer memory can compact away.
+7. Every review round must re-read the current spec or plan file fresh.
+8. Remove all `optional` / `可选` / `可做可不做` wording. Replace it with a requirement, non-goal, or locked assumption.
+9. Once the spec passes, it becomes immutable. Re-read the frozen spec yourself fresh before writing or fixing the plan.
+10. Until the plan reviewer returns `PASS`, the plan is still a mutable draft.
+11. Once the plan passes, it becomes immutable.
+12. Final reporting must include the absolute spec path and the absolute plan path.
 
 ## Default Paths
 
@@ -61,12 +64,14 @@ Always report the absolute resolved paths, not just the repo-relative paths.
 5. Draft the spec first.
 6. Spawn one fresh spec reviewer subagent.
 7. Keep using the same spec reviewer `task_id` until it returns `PASS`.
-8. Freeze the spec.
-9. Write the plan from the immutable spec.
-10. Structure the plan as `TASK_GROUP (CHUNK) -> TASKS -> STEPS`.
-11. Spawn one fresh plan reviewer subagent.
-12. Keep using the same plan reviewer `task_id` until it returns `PASS`.
-13. Report both absolute paths.
+8. Freeze the spec only after `PASS`. Until then it remains an editable draft.
+9. Re-read the frozen spec yourself fresh. Do not rely on memory from the drafting or review loop.
+10. Only now derive the plan from the immutable spec. Any `TASK_GROUP`, `TASK`, `STEP`, or tentative task outline counts as plan drafting.
+11. Structure the plan as `TASK_GROUP (CHUNK) -> TASKS -> STEPS`.
+12. Spawn one fresh plan reviewer subagent.
+13. Keep using the same plan reviewer `task_id` until it returns `PASS`.
+14. Freeze the plan only after `PASS`.
+15. Report both absolute paths.
 
 Do not stop after the spec. Do not stop after the first review round. The workflow ends only after both documents converge.
 
@@ -115,14 +120,16 @@ Every message to the spec reviewer must fully include:
 - Important must-read file absolute paths.
 - Optional grep keywords.
 - Spec absolute path.
+- Explicit statement that the spec is still a mutable draft until the reviewer returns `PASS`; it is not immutable yet.
 - Final summary or design recap highlights.
 - A short note of previous findings and what changed since the last round.
 - This exact review contract:
   1. Re-read the spec file fresh on every round. Other files do not need a fresh re-read every round.
-  2. Find every ambiguous statement, especially `optional`, `可选`, `可做可不做`, and any wording that leaves implementation freedom.
-  3. Focus on implementability, correctness, macro-level soundness, internal consistency, and absence of ambiguity. Do not nitpick style.
-  4. Return all findings in one pass. Do not drip-feed one finding at a time.
-  5. Return exactly `CHANGES_REQUIRED|PASS`, `SUGGEST_CHANGES`, and `RATIONALE`.
+  2. Treat the spec as a mutable draft until you return `PASS`. Do not assume it is already frozen.
+  3. Find every ambiguous statement, especially `optional`, `可选`, `可做可不做`, and any wording that leaves implementation freedom.
+  4. Focus on implementability, correctness, macro-level soundness, internal consistency, and absence of ambiguity. Do not nitpick style.
+  5. Return all findings in one pass. Do not drip-feed one finding at a time.
+  6. Return exactly `CHANGES_REQUIRED|PASS`, `SUGGEST_CHANGES`, and `RATIONALE`.
 
 Recommended prompt skeleton:
 
@@ -133,15 +140,17 @@ Workspace: <absolute path>
 Must-read files: <absolute paths>
 Optional grep keywords: <keywords>
 Spec path: <absolute path>
+Spec status: mutable draft until you return PASS
 Final recap highlights: <bullets>
 Previous findings and latest changes: <brief note>
 
 Review requirements:
 1. Re-read the spec file fresh on every round. Other files do not need a fresh re-read every round.
-2. Find every ambiguous statement, especially optional wording that leaves implementation freedom.
-3. Focus on implementability, correctness, macro-level soundness, internal consistency, and absence of ambiguity. Do not nitpick style.
-4. Return all findings in one pass.
-5. Return exactly:
+2. Treat the spec as a mutable draft until you return PASS. Do not assume it is already frozen.
+3. Find every ambiguous statement, especially optional wording that leaves implementation freedom.
+4. Focus on implementability, correctness, macro-level soundness, internal consistency, and absence of ambiguity. Do not nitpick style.
+5. Return all findings in one pass.
+6. Return exactly:
    - CHANGES_REQUIRED|PASS
    - SUGGEST_CHANGES
    - RATIONALE
@@ -156,14 +165,16 @@ Every message to the plan reviewer must fully include:
 - Optional grep keywords.
 - Spec absolute path.
 - Plan absolute path.
+- Explicit statement that the spec is immutable baseline and the plan is still a mutable draft until the reviewer returns `PASS`.
 - Final summary or design recap highlights.
 - A short note of previous findings and what changed since the last round.
 - This exact review contract:
   1. Re-read the spec and the plan files fresh on every round. Other files do not need a fresh re-read every round.
-  2. Find every ambiguous statement, especially `optional`, `可选`, `可做可不做`, and any wording that leaves implementation freedom.
-  3. Focus on reasonable task architecture, strict alignment with the spec, and practical executability. Do not nitpick style.
-  4. Return all findings in one pass. Do not drip-feed one finding at a time.
-  5. Return exactly `CHANGES_REQUIRED|PASS`, `SUGGEST_CHANGES`, and `RATIONALE`.
+  2. Treat the spec as immutable baseline. Treat the plan as a mutable draft until you return `PASS`.
+  3. Find every ambiguous statement, especially `optional`, `可选`, `可做可不做`, and any wording that leaves implementation freedom.
+  4. Focus on reasonable task architecture, strict alignment with the spec, and practical executability. Do not nitpick style.
+  5. Return all findings in one pass. Do not drip-feed one finding at a time.
+  6. Return exactly `CHANGES_REQUIRED|PASS`, `SUGGEST_CHANGES`, and `RATIONALE`.
 
 Recommended prompt skeleton:
 
@@ -175,15 +186,18 @@ Must-read files: <absolute paths>
 Optional grep keywords: <keywords>
 Spec path: <absolute path>
 Plan path: <absolute path>
+Spec status: immutable baseline
+Plan status: mutable draft until you return PASS
 Final recap highlights: <bullets>
 Previous findings and latest changes: <brief note>
 
 Review requirements:
 1. Re-read the spec and the plan files fresh on every round. Other files do not need a fresh re-read every round.
-2. Find every ambiguous statement, especially optional wording that leaves implementation freedom.
-3. Focus on reasonable task architecture, strict alignment with the spec, and practical executability. Do not nitpick style.
-4. Return all findings in one pass.
-5. Return exactly:
+2. Treat the spec as immutable baseline. Treat the plan as a mutable draft until you return PASS.
+3. Find every ambiguous statement, especially optional wording that leaves implementation freedom.
+4. Focus on reasonable task architecture, strict alignment with the spec, and practical executability. Do not nitpick style.
+5. Return all findings in one pass.
+6. Return exactly:
    - CHANGES_REQUIRED|PASS
    - SUGGEST_CHANGES
    - RATIONALE
@@ -194,6 +208,9 @@ Review requirements:
 - If the reviewer returns stale findings, explicitly tell it to re-read the current file fresh and ignore superseded points.
 - Do not discard the reviewer and open a new session. Keep the same reviewer `task_id` for that document until convergence.
 - The spec and plan reviewers must be different fresh sessions. Reusing the spec reviewer for the plan weakens separation.
+- The spec-review loop must fully converge before any plan drafting or plan review begins.
+- After the spec reviewer returns `PASS`, freeze the spec and re-read it fresh yourself before deriving the plan.
+- The plan remains editable until the plan reviewer returns `PASS`; only then freeze it.
 
 ## No-Ambiguity Scan
 
@@ -230,7 +247,10 @@ Do not carry the ambiguous wording into the final docs.
 |--------|---------|
 | "Parallel reviewers are faster" | This workflow requires one persistent reviewer session per document so feedback converges instead of forking. |
 | "Self-review is enough" | No. The contract requires a dedicated spec reviewer and a dedicated plan reviewer. |
+| "I can sketch rough TASK_GROUPS while the spec review is running" | No. A tentative task outline is still plan derivation. Do not draft any part of the plan before the spec passes, freezes, and is re-read fresh. |
 | "The spec can keep evolving while I write the plan" | No. The plan must be written from an immutable spec. |
+| "I already know the spec from drafting it, so I can skip the post-freeze re-read" | No. Re-read the frozen spec fresh before deriving the plan so the plan matches the final immutable text, not your memory. |
+| "The spec reviewer will understand that the spec is still a draft" | No. Tell the spec reviewer explicitly that the spec is mutable until `PASS`; do not rely on inference. |
 | "Optional wording is fine because the implementer is smart" | Smart implementers still diverge when the spec leaves freedom. Remove the freedom. |
 | "I'll open a new reviewer session after each edit" | No. Reuse the same reviewer `task_id` until `PASS` so the reviewer can converge on the latest draft. |
 | "I'll only fix the major findings and ignore the rest" | The reviewer must report all findings in one pass and you must resolve them before `PASS`. |
@@ -238,10 +258,13 @@ Do not carry the ambiguous wording into the final docs.
 ## Red Flags
 
 - Reopening brainstorming instead of distilling the approved recap.
+- Drafting any `TASK_GROUP`, `TASK`, `STEP`, or tentative task outline before the spec passes and freezes.
 - Writing the plan before the spec passes.
 - Using more than one spec reviewer session.
 - Using more than one plan reviewer session.
 - Letting the reviewer skip a fresh re-read of the current file.
+- Skipping the fresh self re-read of the frozen spec before plan drafting.
+- Letting the spec reviewer assume the spec is already immutable.
 - Editing the spec after declaring it immutable.
 - Returning relative paths only.
 - Leaving `optional` or similar wording in either final document.
@@ -252,5 +275,7 @@ The workflow is complete only when:
 
 1. The spec reviewer returns `PASS`.
 2. The spec is frozen.
-3. The plan reviewer returns `PASS`.
-4. You report the absolute spec path and absolute plan path.
+3. The frozen spec is re-read fresh before plan drafting.
+4. The plan reviewer returns `PASS`.
+5. The plan is frozen.
+6. You report the absolute spec path and absolute plan path.
