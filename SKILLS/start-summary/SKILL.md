@@ -7,7 +7,7 @@ description: Use when a final conversation summary or design recap must become c
 
 ## Overview
 
-Turn the last approved summary or design recap into two on-disk documents in two locked phases: converge the spec first, freeze it, re-read the frozen spec fresh, then derive and converge the implementation plan from that immutable spec. Do not reopen brainstorming. Do not leave optional wording. Use one persistent reviewer session for the spec and one persistent reviewer session for the plan until each passes.
+Turn the last approved summary or design recap into two on-disk documents in two locked phases: converge the spec first, freeze it, re-read the frozen spec fresh, then derive and converge the implementation plan from that immutable spec. Do not reopen brainstorming. Do not leave optional wording. Use one persistent reviewer session for the spec and one persistent reviewer session for the plan until each passes. The frozen plan is a derived coordination document, not a second point of truth equal to the frozen spec.
 
 ## When to Use
 
@@ -34,9 +34,12 @@ Do not use this skill when the design is still unsettled. That is a brainstormin
 7. Every review round must re-read the current spec or plan file fresh.
 8. Remove all `optional` / `可选` / `可做可不做` wording. Replace it with a requirement, non-goal, or locked assumption.
 9. Once the spec passes, it becomes immutable. Re-read the frozen spec yourself fresh before writing or fixing the plan.
-10. Until the plan reviewer returns `PASS`, the plan is still a mutable draft.
-11. Once the plan passes, it becomes immutable.
-12. Final reporting must include the absolute spec path and the absolute plan path.
+10. The frozen spec is the product and behavior truth. The referenced repo or codebase is the executability truth. The plan is a derived coordination artifact and must never become a second point of truth.
+11. If the plan conflicts with the frozen spec, the plan is wrong and must be revised. Do not reinterpret the spec to save the plan.
+12. If later implementation proves that a frozen plan step is actually unexecutable against the real codebase, or executable only by drifting from the frozen spec, treat that as plan drift evidence. The downstream lead must investigate and adjudicate against the frozen spec plus actual codebase evidence instead of mechanically following the broken step.
+13. Until the plan reviewer returns `PASS`, the plan is still a mutable draft.
+14. Once the plan passes, it becomes immutable.
+15. Final reporting must include the absolute spec path and the absolute plan path.
 
 ## Default Paths
 
@@ -112,6 +115,16 @@ The plan must be executable by a little-context engineer. It must not leave room
 
 Each chunk may contain multiple tasks. Each task must have its own steps. Do not collapse chunk, task, and step into one flat list.
 
+## Truth Hierarchy
+
+- The frozen spec is the product and behavior truth.
+- The referenced repo or codebase is the executability truth.
+- The frozen plan is a derived coordination document. It must never become a second point of truth equal to the spec.
+- If a plan step conflicts with the frozen spec, the spec wins and the plan must be fixed.
+- If later execution proves a frozen plan step impossible against the real codebase, or possible only by drifting from the frozen spec, that is plan drift evidence. The downstream lead must investigate and adjudicate against the frozen spec plus actual codebase evidence.
+- If the downstream investigation confirms the plan step is wrong but the work can continue safely while respecting the frozen spec and actual codebase truth, execution may continue under the adjudicated understanding and the docs can be reconverged later.
+- If the downstream investigation cannot safely resolve the drift without changing the frozen spec, or cannot establish a safe executable path, stop execution and reconverge the docs from the frozen spec before continuing.
+
 ## Spec Reviewer Prompt Contract
 
 Every message to the spec reviewer must fully include:
@@ -172,9 +185,10 @@ Every message to the plan reviewer must fully include:
   1. Re-read the spec and the plan files fresh on every round. Other files do not need a fresh re-read every round.
   2. Treat the spec as immutable baseline. Treat the plan as a mutable draft until you return `PASS`.
   3. Find every ambiguous statement, especially `optional`, `可选`, `可做可不做`, and any wording that leaves implementation freedom.
-  4. Focus on reasonable task architecture, strict alignment with the spec, and practical executability. Do not nitpick style.
-  5. Return all findings in one pass. Do not drip-feed one finding at a time.
-  6. Return exactly `CHANGES_REQUIRED|PASS`, `SUGGEST_CHANGES`, and `RATIONALE`.
+  4. Focus on reasonable task architecture, strict alignment with the spec, practical executability, and preventing the plan from becoming a second point of truth. Do not nitpick style.
+  5. If a plan step depends on repo assumptions that are not supported by the must-read files, or would require spec drift if implemented literally, return `CHANGES_REQUIRED`; do not reinterpret the spec to save the plan. This is plan drift evidence for downstream adjudication, not proof that execution must always terminate immediately.
+  6. Return all findings in one pass. Do not drip-feed one finding at a time.
+  7. Return exactly `CHANGES_REQUIRED|PASS`, `SUGGEST_CHANGES`, and `RATIONALE`.
 
 Recommended prompt skeleton:
 
@@ -195,9 +209,10 @@ Review requirements:
 1. Re-read the spec and the plan files fresh on every round. Other files do not need a fresh re-read every round.
 2. Treat the spec as immutable baseline. Treat the plan as a mutable draft until you return PASS.
 3. Find every ambiguous statement, especially optional wording that leaves implementation freedom.
-4. Focus on reasonable task architecture, strict alignment with the spec, and practical executability. Do not nitpick style.
-5. Return all findings in one pass.
-6. Return exactly:
+4. Focus on reasonable task architecture, strict alignment with the spec, practical executability, and preventing the plan from becoming a second point of truth. Do not nitpick style.
+5. If a plan step depends on repo assumptions that are not supported by the must-read files, or would require spec drift if implemented literally, return CHANGES_REQUIRED; do not reinterpret the spec to save the plan. This is plan drift evidence for downstream adjudication, not proof that execution must always terminate immediately.
+6. Return all findings in one pass.
+7. Return exactly:
    - CHANGES_REQUIRED|PASS
    - SUGGEST_CHANGES
    - RATIONALE
@@ -211,6 +226,7 @@ Review requirements:
 - The spec-review loop must fully converge before any plan drafting or plan review begins.
 - After the spec reviewer returns `PASS`, freeze the spec and re-read it fresh yourself before deriving the plan.
 - The plan remains editable until the plan reviewer returns `PASS`; only then freeze it.
+- If later execution proves a frozen plan step unexecutable or spec-drifting, treat that as plan drift evidence for downstream adjudication. Re-converge from the frozen spec only if that downstream investigation cannot establish a safe executable path that still respects the frozen spec and actual codebase truth.
 
 ## No-Ambiguity Scan
 
@@ -254,6 +270,8 @@ Do not carry the ambiguous wording into the final docs.
 | "Optional wording is fine because the implementer is smart" | Smart implementers still diverge when the spec leaves freedom. Remove the freedom. |
 | "I'll open a new reviewer session after each edit" | No. Reuse the same reviewer `task_id` until `PASS` so the reviewer can converge on the latest draft. |
 | "I'll only fix the major findings and ignore the rest" | The reviewer must report all findings in one pass and you must resolve them before `PASS`. |
+| "Once the plan passes, it becomes co-equal truth with the spec" | No. The plan is a derived coordination document. The frozen spec remains the product truth. |
+| "If later codebase reality disproves a frozen plan step, implementation should still follow the plan" | No. Treat that as plan drift evidence. The downstream lead must adjudicate against the frozen spec and actual codebase truth. |
 
 ## Red Flags
 
@@ -268,6 +286,8 @@ Do not carry the ambiguous wording into the final docs.
 - Editing the spec after declaring it immutable.
 - Returning relative paths only.
 - Leaving `optional` or similar wording in either final document.
+- Treating the frozen plan as a second point of truth equal to the frozen spec.
+- Leaving no downstream rule for investigation and adjudication when real codebase analysis disproves a frozen plan step.
 
 ## Completion
 

@@ -7,7 +7,7 @@ description: Use when acting as a P9 tech lead who must execute an immutable spe
 
 ## Overview
 
-Run implementation as a P9 controller from immutable spec and plan documents. You do not write code yourself. Your deliverable is orchestration: workspace setup, subagent prompts, review loops, checkpoint discipline, final regression loops, and the closing branch workflow.
+Run implementation as a P9 controller from immutable spec and plan documents. You do not write code yourself. Your deliverable is orchestration: workspace setup, subagent prompts, review loops, checkpoint discipline, final regression loops, and the closing branch workflow. The immutable plan is a derived coordination document, not a second source of truth over the spec or the real codebase.
 
 ## Required Skills
 
@@ -52,6 +52,14 @@ Subagents must also be told that if they are compacted and lose loaded-skill mem
 8. If a task enters a second implementation or review round, all later rounds for that task must explicitly invoke `pua` and `systematic-debugging` in the subagent prompt.
 9. No implementer commits before spec review and code review both converge for that task granularity.
 10. After both reviews converge, require the implementer to create the checkpoint commit before you advance.
+11. The immutable spec is the product and behavior truth. The real repo or worktree is the executability truth. The immutable plan is a derived coordination artifact, not a co-equal point of truth.
+12. If a frozen plan step conflicts with the immutable spec, the spec wins.
+13. If a frozen plan step is proven unexecutable as written against the repo or worktree, or executable only by drifting from the immutable spec, that is plan drift evidence.
+14. Do not make the code worse, less correct, or spec-drifting just to preserve alignment with a wrong plan step.
+15. When plan drift evidence appears, P9 must pause the affected scope, dispatch fresh investigation subagents, and adjudicate against the immutable spec plus actual repo or worktree evidence.
+16. If the investigation shows the plan step is wrong but the work can continue safely while respecting the immutable spec and actual repo or worktree truth, P9 must continue execution under the adjudicated understanding and route doc reconvergence later.
+17. If the investigation cannot establish a safe executable path that still respects the immutable spec, or shows the immutable spec itself must change, stop the workflow and raise a `PLAN_INVALIDATED` exception report.
+18. Do not silently reinterpret the plan and do not keep iterating the same unsatisfiable review loop.
 
 ## Workflow Skeleton
 
@@ -83,10 +91,14 @@ For each task or task-group, follow this loop:
 4. Implementer completes the assigned scope.
 5. Spec reviewer checks spec and plan alignment for that same scope.
 6. Code reviewer checks correctness, regressions, and quality for that same scope.
-7. If either reviewer returns blocking findings, send all findings back to the same implementer.
-8. Repeat until both reviewers converge.
-9. Only then require the implementer to create the checkpoint commit.
-10. After the checkpoint commit succeeds, advance to the next scope.
+7. If the implementer or either reviewer produces plan drift evidence, pause the affected scope and run a P9-controlled adjudication loop before deciding whether execution can continue.
+8. In the adjudication loop, spawn fresh read-only investigation subagents to compare the immutable spec, the frozen plan, and actual repo or worktree evidence. They may read files and run read-only verification commands, but may not modify files.
+9. If the adjudication concludes the plan step is wrong but execution can continue safely while respecting the immutable spec and actual repo or worktree truth, continue the scope under that adjudicated understanding.
+10. If the adjudication cannot establish a safe executable path that still respects the immutable spec, stop the current scope and raise a `PLAN_INVALIDATED` exception report.
+11. If either reviewer returns blocking findings that do not require adjudication or invalidation, send all findings back to the same implementer.
+12. Repeat until both reviewers converge.
+13. Only then require the implementer to create the checkpoint commit.
+14. After the checkpoint commit succeeds, advance to the next scope.
 
 Do not return to the user after one checkpoint. Continue until all scopes are complete.
 
@@ -103,11 +115,13 @@ After the last task checkpoint:
 1. Gather all checkpoint commits.
 2. Spawn one fresh final spec reviewer and one fresh final code reviewer.
 3. Review all checkpoint commits against the immutable spec and plan.
-4. If both pass, continue.
-5. If either returns `CHANGES_REQUIRED`, spawn one fresh final implementer.
-6. Send all mandatory and optional findings to the final implementer.
-7. Re-run the two final reviewers until convergence.
-8. Require the final implementer to create the final checkpoint commit.
+4. If either reviewer produces plan drift evidence, run a P9-controlled adjudication loop before deciding whether execution can continue.
+5. If the adjudication cannot establish a safe executable path that still respects the immutable spec, stop and raise a `PLAN_INVALIDATED` exception report.
+6. If both pass, continue.
+7. If either returns `CHANGES_REQUIRED`, spawn one fresh final implementer.
+8. Send all mandatory and optional findings to the final implementer.
+9. Re-run the two final reviewers until convergence.
+10. Require the final implementer to create the final checkpoint commit.
 
 ### 4. Squash And Regression Loop
 
@@ -118,12 +132,14 @@ After the final checkpoint:
 3. Spawn one fresh regression-and-plan-alignment spec reviewer and one fresh regression-and-plan-alignment code reviewer.
 4. Review only for spec alignment, plan alignment, regression risk, split-brain behavior, undocumented features or bugs, race conditions, and correctness.
 5. Do not allow these reviewers to nitpick.
-6. If both pass one-shot, the implementation phase ends happily.
-7. If either returns `CHANGES_REQUIRED`, spawn one fresh regression-fix implementer.
-8. Send all mandatory and optional findings to that implementer.
-9. Re-run the two regression reviewers until convergence.
-10. Require the regression-fix implementer to create the regression-fix checkpoint commit.
-11. Back up the history again, resquash into one commit, and repeat the regression loop.
+6. If either reviewer produces plan drift evidence, run a P9-controlled adjudication loop before deciding whether execution can continue.
+7. If the adjudication cannot establish a safe executable path that still respects the immutable spec, stop and raise a `PLAN_INVALIDATED` exception report.
+8. If both pass one-shot, the implementation phase ends happily.
+9. If either returns `CHANGES_REQUIRED`, spawn one fresh regression-fix implementer.
+10. Send all mandatory and optional findings to that implementer.
+11. Re-run the two regression reviewers until convergence.
+12. Require the regression-fix implementer to create the regression-fix checkpoint commit.
+13. Back up the history again, resquash into one commit, and repeat the regression loop.
 
 If `MAX_SQUASH_REVIEW_COUNT` is unspecified, ask the user for it before entering this loop.
 
@@ -171,6 +187,8 @@ Every subagent prompt must include:
 - current progress state
 - assigned scope text verbatim
 - explicit reminder to read spec and plan in full before working or reviewing
+- explicit reminder that the immutable spec is the product truth, the repo or worktree is the executability truth, and a proven-unexecutable frozen plan step must be escalated rather than mechanically followed
+- explicit reminder that plan drift evidence triggers P9 investigation and adjudication, not automatic termination
 - explicit reminder not to leave cleanup for later subagents
 - any no-compat / no-legacy rule if that principle applies
 - docs rule when docs are touched: YAGNI, Occam's Razor, no historical narration, describe present state only, align format and tone with existing docs
@@ -191,9 +209,28 @@ Reviewer prompts must additionally include:
 - Read-only bash verification and probe scripts are allowed and encouraged.
 - Do not run destructive commands.
 - Re-read the immutable spec and plan before reviewing the current scope.
+- If the current implementation is spec-correct but a frozen plan step is proven unexecutable or spec-drifting, return plan drift evidence with evidence instead of requesting mechanical re-alignment to the broken step.
 - Return all findings in one pass.
 
 For second and later rounds on the same scope, reviewer prompts must explicitly tell the reviewer to invoke `pua` and `systematic-debugging`.
+
+## Adjudication Loop
+
+When plan drift evidence appears:
+
+1. P9 pauses the affected scope. Do not let the implementer keep making speculative changes while the drift question is unresolved.
+2. Spawn fresh read-only investigation subagents. At minimum, use:
+   - one investigation subagent focused on immutable spec plus actual repo or worktree evidence
+   - one investigation subagent focused on whether the frozen plan step is still executable as written
+3. Investigation subagents may read files and run read-only verification commands, but may not modify repo or worktree files.
+4. Ask both subagents to return a concrete judgment with evidence, not vague risk language.
+5. P9 adjudicates using this priority order:
+   - immutable spec truth
+   - actual repo or worktree executability truth
+   - frozen plan as derived coordination
+6. If the adjudication shows the plan step is wrong but execution can continue safely without changing the immutable spec, continue execution under the adjudicated understanding.
+7. If the adjudication shows there is no safe executable path without changing the immutable spec, or the evidence is insufficient to establish one, raise `PLAN_INVALIDATED` and route back to doc reconvergence.
+8. Record the adjudication rationale in the prompts for all later subagents on that scope so the same drift issue is not re-litigated from scratch.
 
 ## Implementer Prompt Contract
 
@@ -203,6 +240,7 @@ Implementer prompts must additionally include:
 - Before declaring done, compare your diff against the checkpoint baseline and verify alignment with the task requirements.
 - Pass your exact completion claims back so the lead can forward them to both reviewers.
 - Do not create a commit until both reviewers converge.
+- If you prove a frozen plan step is unexecutable or spec-drifting, stop and report evidence for P9 adjudication. Do not silently substitute a new route and do not degrade spec compliance just to preserve plan alignment.
 
 For second and later rounds on the same scope, implementer prompts must explicitly tell the implementer to invoke `pua` and `systematic-debugging`.
 
@@ -221,13 +259,21 @@ If a subtask is frontend-related, explicitly instruct the subagent to load relev
 Allowed hard stop:
 
 - Worktree scaffold or baseline verification reveals a red baseline and the CTO gave no special override.
+- P9 adjudication concludes there is no safe executable path that still respects the immutable spec, or that the immutable spec itself must change.
 
 When this happens, raise an exception report with:
 
 - repo or worktree absolute path
+- immutable spec absolute path
+- immutable plan absolute path
+- current scope
+- exact blocked plan step or steps
+- adjudication summary
 - failing baseline commands
 - failing output summary
+- read-only evidence showing why the step is unexecutable or spec-drifting
 - why the workflow cannot safely continue
+- explicit statement that the plan is invalidated and must be reconverged from the immutable spec before execution resumes
 
 ## Common Rationalizations
 
@@ -240,6 +286,9 @@ When this happens, raise an exception report with:
 | "Reviewers can fix obvious issues directly" | No. Reviewers are read-only. Implementers implement. |
 | "The final pass is enough; I can skip task-level reviews" | No. Task-level dual reviews are mandatory. |
 | "One squash review is enough" | No. The workflow requires repeated squash or resquash review until the stop condition. |
+| "The frozen plan outranks repo reality once execution starts" | No. The plan is derived coordination, not executability truth. Drift evidence must be adjudicated against spec plus actual repo or worktree evidence. |
+| "If code matches the spec but not the broken plan, reviewers should force it back to the plan" | No. Return plan drift evidence. P9 adjudicates; do not make spec-correct code worse to preserve a broken plan step. |
+| "Any proven wrong plan step means the workflow must terminate immediately" | No. First run the adjudication loop. Only stop if adjudication cannot establish a safe executable path that still respects the immutable spec. |
 
 ## Red Flags
 
@@ -252,6 +301,9 @@ When this happens, raise an exception report with:
 - Letting reviewers modify files.
 - Forgetting the compaction reminder or the original prompt preservation rule.
 - Skipping `verification-before-completion` or `finishing-a-development-branch`.
+- Forcing spec-correct code back toward a broken plan step instead of returning plan drift evidence for adjudication.
+- Jumping straight to terminal `PLAN_INVALIDATED` without running the adjudication loop.
+- Keeping an unsatisfiable review loop running after adjudication already established that a frozen plan step is wrong.
 
 ## Completion
 
