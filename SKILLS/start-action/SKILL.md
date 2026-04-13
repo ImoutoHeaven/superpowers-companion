@@ -7,7 +7,7 @@ description: Use when acting as a P9 tech lead who must execute an immutable spe
 
 ## Overview
 
-Run implementation as a P9 controller from immutable spec and plan documents. You do not write code yourself. Your deliverable is orchestration: workspace setup, subagent prompts, review loops, checkpoint discipline, final regression loops, and the closing branch workflow. The immutable plan is a derived coordination document, not a second source of truth over the spec or the real codebase.
+Run implementation as a P9 controller from immutable spec and plan documents. You do not write code yourself. Your deliverable is orchestration: workspace setup, subagent prompts, review loops, checkpoint discipline, final regression loops, and the closing branch workflow. The immutable plan is a derived coordination document, not a second source of truth over the spec or the real codebase. During execution, P9 must also maintain one worktree-local drift adjudication ledger as the durable execution-stage overlay artifact for already-adjudicated plan drift.
 
 ## Required Skills
 
@@ -61,14 +61,17 @@ Subagents must also be told that if they are compacted and lose loaded-skill mem
 9. No implementer commits before spec review and code review both converge for that task granularity.
 10. After both reviews converge, require the implementer to create the checkpoint commit before you advance.
 11. The immutable spec is the product and behavior truth. The real repo or worktree is the executability truth. The immutable plan is a derived coordination artifact, not a co-equal point of truth.
-12. If a frozen plan step conflicts with the immutable spec, the spec wins.
-13. If a frozen plan step is proven unexecutable as written against the repo or worktree, or executable only by drifting from the immutable spec, that is plan drift evidence.
-14. Do not make the code worse, less correct, or spec-drifting just to preserve alignment with a wrong plan step.
-15. When plan drift evidence appears, P9 must pause the affected scope, dispatch fresh investigation subagents, and adjudicate against the immutable spec plus actual repo or worktree evidence.
-16. If the investigation shows the plan step is wrong but the work can continue safely while respecting the immutable spec and actual repo or worktree truth, P9 must continue execution under the adjudicated understanding and route doc reconvergence later.
-17. If the investigation cannot establish a safe executable path that still respects the immutable spec, or shows the immutable spec itself must change, stop the workflow and raise a `PLAN_INVALIDATED` exception report.
-18. Do not silently reinterpret the plan and do not keep iterating the same unsatisfiable review loop.
-19. Every start-action subagent must invoke its role-local skill before acting, and must re-invoke that same role-local skill after compaction if loaded-skill memory is lost.
+12. The drift adjudication ledger is a durable execution-stage overlay artifact for this workflow. It never overrides the immutable spec or actual repo or worktree truth.
+13. The drift adjudication ledger does override literal reuse of any frozen plan step already adjudicated stale for this workflow until a later adjudication supersedes that entry.
+14. If a frozen plan step conflicts with the immutable spec, the spec wins.
+15. If a frozen plan step is proven unexecutable as written against the repo or worktree, or executable only by drifting from the immutable spec, that is plan drift evidence.
+16. Do not make the code worse, less correct, or spec-drifting just to preserve alignment with a wrong plan step.
+17. When plan drift evidence appears, P9 must pause the affected scope, dispatch fresh investigation subagents, and adjudicate against the immutable spec plus actual repo or worktree evidence.
+18. If the investigation shows the plan step is wrong but the work can continue safely while respecting the immutable spec and actual repo or worktree truth, P9 must append a durable ledger entry before execution resumes.
+19. If the investigation shows the immutable spec itself must change before work can safely continue, stop the workflow and raise a `SPEC_RECONVERGENCE_REQUIRED` exception report.
+20. If the investigation cannot establish a safe executable path or binding execution overlay from current authoritative evidence, stop the workflow and raise an `ADJUDICATION_INSUFFICIENT_EVIDENCE` exception report.
+21. Do not silently reinterpret the plan and do not keep iterating the same unsatisfiable review loop.
+22. Every start-action subagent must invoke its role-local skill before acting, and must re-invoke that same role-local skill after compaction if loaded-skill memory is lost.
 
 ## Workflow Skeleton
 
@@ -83,10 +86,12 @@ Before any implementation task:
 5. Create the task worktree under:
    - single repo: `<repo>/.worktrees/<branch-name>/`
    - multi repo: `<each-repo>/.worktrees/<branch-name>/`
-6. Inside the worktree, create `docs/superpowers/<foldernames>/`.
-7. Copy the immutable spec and plan docs into the worktree docs path.
-8. Install project dependencies inside the worktree.
-9. Verify the baseline test suite in the worktree.
+6. Inside the worktree, create `docs/superpowers/specs/`, `docs/superpowers/plans/`, and `docs/superpowers/drift-adjudication/`.
+7. Copy the immutable spec and plan docs into the corresponding worktree docs paths.
+8. Resolve one drift adjudication ledger path under `docs/superpowers/drift-adjudication/`, reusing the immutable plan basename when possible.
+9. Create the ledger file before any implementation or review subagent runs. Seed it with the immutable spec path, immutable plan path, and an empty `## Active Adjudications Summary` section.
+10. Install project dependencies inside the worktree.
+11. Verify the baseline test suite in the worktree.
 
 If the baseline is red and the CTO gave no special instruction, stop the workflow and raise an exception report. That is an allowed terminal state.
 
@@ -106,13 +111,14 @@ For each task or task-group, follow this loop:
 10. Code reviewer checks correctness, regressions, quality, and whether actual repo or worktree evidence proves the frozen plan step stale or unexecutable for that same scope.
 11. If either reviewer returns `NEEDS_CONTEXT`, resend the missing authoritative inputs to that same reviewer session and repeat the same review round.
 12. If either reviewer produces plan drift evidence, pause the affected scope and run a P9-controlled adjudication loop before deciding whether execution can continue.
-13. In the adjudication loop, spawn fresh read-only investigation subagents to compare the immutable spec, the frozen plan, and actual repo or worktree evidence. They may read files and run read-only verification commands, but may not modify files.
-14. If the adjudication concludes the plan step is wrong but execution can continue safely while respecting the immutable spec and actual repo or worktree truth, continue the scope under that adjudicated understanding.
-15. If the adjudication cannot establish a safe executable path that still respects the immutable spec, stop the current scope and raise a `PLAN_INVALIDATED` exception report.
-16. If either reviewer returns blocking findings that do not require adjudication or invalidation, send all findings back to the same implementer.
-17. Repeat until both reviewers converge.
-18. Only then require the implementer to create the checkpoint commit.
-19. After the checkpoint commit succeeds, advance to the next scope.
+13. In the adjudication loop, spawn fresh read-only investigation subagents to compare the immutable spec, the frozen plan, the drift adjudication ledger, and actual repo or worktree evidence. They may read files and run read-only verification commands, but may not modify files.
+14. If the adjudication concludes `EXECUTABLE_AS_WRITTEN` or `PLAN_DRIFT_CONTINUE_SAFE`, append a ledger entry and update the active summary before resuming. Continue the scope under the effective execution contract recorded there.
+15. If the adjudication concludes `SPEC_RECONVERGENCE_REQUIRED`, append the ledger entry, stop the current scope, and raise a `SPEC_RECONVERGENCE_REQUIRED` exception report.
+16. If the adjudication concludes `INSUFFICIENT_EVIDENCE`, append the ledger entry, stop the current scope, and raise an `ADJUDICATION_INSUFFICIENT_EVIDENCE` exception report.
+17. If either reviewer returns blocking findings that do not require adjudication or invalidation, send all findings back to the same implementer.
+18. Repeat until both reviewers converge.
+19. Only then require the implementer to create the checkpoint commit.
+20. After the checkpoint commit succeeds, advance to the next scope.
 
 Do not return to the user after one checkpoint. Continue until all scopes are complete.
 
@@ -130,12 +136,13 @@ After the last task checkpoint:
 2. Spawn one fresh final spec reviewer and one fresh final code reviewer.
 3. Review all checkpoint commits against the immutable spec first, then against the frozen plan only as a derived coordination artifact.
 4. If either reviewer produces plan drift evidence, run a P9-controlled adjudication loop before deciding whether execution can continue.
-5. If the adjudication cannot establish a safe executable path that still respects the immutable spec, stop and raise a `PLAN_INVALIDATED` exception report.
-6. If both pass, continue.
-7. If either returns `CHANGES_REQUIRED`, spawn one fresh final implementer.
-8. Send all mandatory and optional findings to the final implementer.
-9. Re-run the two final reviewers until convergence.
-10. Require the final implementer to create the final checkpoint commit.
+5. If the adjudication concludes `SPEC_RECONVERGENCE_REQUIRED` or `INSUFFICIENT_EVIDENCE`, append the ledger entry and stop with the matching exception report.
+6. If the adjudication concludes `EXECUTABLE_AS_WRITTEN` or `PLAN_DRIFT_CONTINUE_SAFE`, continue.
+7. If both pass, continue.
+8. If either returns `CHANGES_REQUIRED`, spawn one fresh final implementer.
+9. Send all mandatory and optional findings to the final implementer.
+10. Re-run the two final reviewers until convergence.
+11. Require the final implementer to create the final checkpoint commit.
 
 ### 4. Squash And Regression Loop
 
@@ -147,13 +154,14 @@ After the final checkpoint:
 4. Review only for immutable spec alignment, whether the frozen plan still remains a valid derived guide, regression risk, split-brain behavior, undocumented features or bugs, race conditions, and correctness.
 5. Do not allow these reviewers to nitpick.
 6. If either reviewer produces plan drift evidence, run a P9-controlled adjudication loop before deciding whether execution can continue.
-7. If the adjudication cannot establish a safe executable path that still respects the immutable spec, stop and raise a `PLAN_INVALIDATED` exception report.
-8. If both pass one-shot, the implementation phase ends happily.
-9. If either returns `CHANGES_REQUIRED`, spawn one fresh regression-fix implementer.
-10. Send all mandatory and optional findings to that implementer.
-11. Re-run the two regression reviewers until convergence.
-12. Require the regression-fix implementer to create the regression-fix checkpoint commit.
-13. Back up the history again, resquash into one commit, and repeat the regression loop.
+7. If the adjudication concludes `SPEC_RECONVERGENCE_REQUIRED` or `INSUFFICIENT_EVIDENCE`, append the ledger entry and stop with the matching exception report.
+8. If the adjudication concludes `EXECUTABLE_AS_WRITTEN` or `PLAN_DRIFT_CONTINUE_SAFE`, continue.
+9. If both pass one-shot, the implementation phase ends happily.
+10. If either returns `CHANGES_REQUIRED`, spawn one fresh regression-fix implementer.
+11. Send all mandatory and optional findings to that implementer.
+12. Re-run the two regression reviewers until convergence.
+13. Require the regression-fix implementer to create the regression-fix checkpoint commit.
+14. Back up the history again, resquash into one commit, and repeat the regression loop.
 
 If `MAX_SQUASH_REVIEW_COUNT` is unspecified, ask the user for it before entering this loop.
 
@@ -169,6 +177,42 @@ Before claiming completion:
 1. Invoke `verification-before-completion`.
 2. Verify the required evidence in the worktree branch.
 3. Invoke `finishing-a-development-branch`.
+
+## Drift Adjudication Ledger
+
+Create exactly one worktree-local ledger per `start-action` workflow under `docs/superpowers/drift-adjudication/`. Reuse the immutable plan basename when possible, for example:
+
+- immutable plan: `/repo/.worktrees/<branch>/docs/superpowers/plans/2026-04-13-data-sync.md`
+- drift ledger: `/repo/.worktrees/<branch>/docs/superpowers/drift-adjudication/2026-04-13-data-sync.md`
+
+This ledger is the durable execution-stage overlay artifact. It records already-adjudicated plan drift and the effective execution contract later agents must follow.
+
+Only P9/controller may create, append, supersede, close, summarize, or otherwise mutate the drift adjudication ledger. Subagents may read it, cite `DRIFT_ID`, report evidence, and request supersession, but may not edit the ledger file directly.
+
+Ledger rules:
+
+- Keep a short `## Active Adjudications Summary` table at the top listing `DRIFT_ID`, `STATUS`, `SCOPE`, `P9_FINAL_ADJUDICATION`, and the one-line effective execution contract.
+- Append one entry per adjudication. Every entry must include:
+  - `DRIFT_ID`
+  - `STATUS: ACTIVE|SUPERSEDED|CLOSED`
+  - `SUPERSEDES_DRIFT_ID: NONE|<DRIFT_ID>`
+  - `SUPERSEDED_BY_DRIFT_ID: NONE|<DRIFT_ID>`
+  - `SCOPE`
+  - `TRIGGER`
+  - `FROZEN_PLAN_STEP`
+  - `GOVERNING_SPEC_REQUIREMENT`
+  - `REPO_OR_WORKTREE_EVIDENCE`
+  - `INVESTIGATOR_JUDGMENTS`
+  - `P9_FINAL_ADJUDICATION`
+  - `EFFECTIVE_EXECUTION_CONTRACT`
+  - `SAFE_TO_CONTINUE: YES|NO`
+  - `REOPEN_ONLY_IF`
+- `EXECUTABLE_AS_WRITTEN` entries may be marked `CLOSED`.
+- `PLAN_DRIFT_CONTINUE_SAFE` entries stay `ACTIVE` until superseded or the workflow finishes.
+- `SPEC_RECONVERGENCE_REQUIRED` and `INSUFFICIENT_EVIDENCE` entries must still be written before raising the exception report.
+- When P9 supersedes an existing entry, append a new entry that names the prior one in `SUPERSEDES_DRIFT_ID`, then update the prior entry's `SUPERSEDED_BY_DRIFT_ID` and `STATUS: SUPERSEDED`.
+- Later subagents must treat relevant non-superseded ledger entries as binding workflow state unless they can prove materially new spec or repo evidence that requires supersession.
+- Do not mutate the frozen plan to hide drift. The ledger is the overlay artifact; the frozen plan stays frozen.
 
 ## Task Granularity
 
@@ -198,11 +242,14 @@ Every subagent prompt must include:
 - worktree absolute path
 - immutable spec absolute path
 - immutable plan absolute path
+- drift adjudication ledger absolute path
 - current progress state
 - assigned scope text verbatim
-- explicit reminder to read spec and plan in full before working or reviewing
-- explicit reminder that the immutable spec is the product truth, the repo or worktree is the executability truth, and a proven-unexecutable frozen plan step must be escalated rather than mechanically followed
+- explicit reminder to read spec, plan, and drift adjudication ledger in full before working or reviewing
+- explicit reminder that the immutable spec is the product truth, the repo or worktree is the executability truth, the drift adjudication ledger is the durable execution-stage overlay artifact, and a proven-unexecutable frozen plan step must be escalated rather than mechanically followed
 - explicit reminder that plan drift evidence triggers P9 investigation and adjudication, not automatic termination
+- explicit reminder that relevant non-superseded drift-ledger entries are binding workflow state unless superseded by materially new evidence
+- explicit reminder that only P9/controller may mutate the drift adjudication ledger; subagents may request supersession but may not edit the ledger directly
 - explicit instruction to invoke the role-local skill for the assigned role before acting
 - explicit reminder not to leave cleanup for later subagents
 - any no-compat / no-legacy rule if that principle applies
@@ -223,10 +270,13 @@ Reviewer prompts must additionally include:
 - You are a reviewer only. Do not modify repo or worktree files.
 - Read-only bash verification and probe scripts are allowed and encouraged.
 - Do not run destructive commands.
-- Re-read the immutable spec and plan before reviewing the current scope.
+- Re-read the immutable spec, the frozen plan, and the drift adjudication ledger before reviewing the current scope.
 - Review immutable spec alignment first. Treat the frozen plan as a derived guide, not co-equal truth.
+- If a relevant non-superseded drift-ledger entry already adjudicates the same frozen-plan mismatch and no materially new evidence disproves it, review against the effective execution contract recorded there instead of re-raising the same drift finding.
 - If any authoritative review artifact is missing after compaction, broken handoff, or prompt loss, return `NEEDS_CONTEXT` instead of guessing from partial notes or repo wandering.
+- If the drift adjudication ledger is missing after compaction, broken handoff, or prompt loss, return `NEEDS_CONTEXT` instead of silently re-litigating previously adjudicated drift.
 - If the current implementation is spec-correct but a frozen plan step is proven unexecutable or spec-drifting, return plan drift evidence with evidence instead of requesting mechanical re-alignment to the broken step.
+- If you believe a relevant non-superseded ledger entry is now wrong, return plan drift evidence with explicit supersession evidence instead of silently ignoring the ledger.
 - Return all findings in one pass.
 
 For second and later rounds on the same scope, reviewer prompts must explicitly tell the reviewer to invoke `pua` and `systematic-debugging`.
@@ -244,20 +294,26 @@ When plan drift evidence appears:
 5. P9 adjudicates using this priority order:
    - immutable spec truth
    - actual repo or worktree executability truth
+   - relevant non-superseded drift adjudication ledger entries as already-adjudicated workflow state
    - frozen plan as derived coordination
-6. If the adjudication shows the plan step is wrong but execution can continue safely without changing the immutable spec, continue execution under the adjudicated understanding.
-7. If the adjudication shows there is no safe executable path without changing the immutable spec, or the evidence is insufficient to establish one, raise `PLAN_INVALIDATED` and route back to doc reconvergence.
-8. Record the adjudication rationale in the prompts for all later subagents on that scope so the same drift issue is not re-litigated from scratch.
+6. If the adjudication result is `EXECUTABLE_AS_WRITTEN`, append a `CLOSED` ledger entry that records the false-positive drift claim, then continue using the frozen plan as written.
+7. If the adjudication result is `PLAN_DRIFT_CONTINUE_SAFE`, append an `ACTIVE` ledger entry that records the stale plan step, the governing spec requirement, and the effective execution contract, then continue under that recorded understanding.
+8. If the adjudication result is `SPEC_RECONVERGENCE_REQUIRED`, append the ledger entry, then raise `SPEC_RECONVERGENCE_REQUIRED`.
+9. If the adjudication result is `INSUFFICIENT_EVIDENCE`, append the ledger entry, then raise `ADJUDICATION_INSUFFICIENT_EVIDENCE`.
+10. Later subagent prompts must include the ledger path and any relevant `DRIFT_ID` values. Do not rely on prompt paraphrase alone.
 
 ## Implementer Prompt Contract
 
 Implementer prompts must additionally include:
 
 - You own this scope end to end. Do not expect later agents to finish your cleanup.
+- Read the drift adjudication ledger before touching code. If a relevant non-superseded entry already defines the safe route, implement against that effective execution contract instead of re-litigating the same stale plan step.
+- Do not edit the drift adjudication ledger directly. If you think it must change, return evidence and the relevant `DRIFT_ID` for P9 to adjudicate.
 - Before declaring done, compare your diff against the checkpoint baseline and verify alignment with the task requirements.
 - Pass your exact completion claims back so the lead can forward them to both reviewers.
 - Do not create a commit until both reviewers converge.
 - If you prove a frozen plan step is unexecutable or spec-drifting, stop and report evidence for P9 adjudication. Do not silently substitute a new route and do not degrade spec compliance just to preserve literal plan alignment.
+- If materially new evidence disproves a relevant non-superseded drift-ledger entry, return plan drift evidence with explicit supersession evidence. Do not silently overrule the ledger.
 
 For second and later rounds on the same scope, implementer prompts must explicitly tell the implementer to invoke `pua` and `systematic-debugging`.
 
@@ -276,21 +332,26 @@ If a subtask is frontend-related, explicitly instruct the subagent to load relev
 Allowed hard stop:
 
 - Worktree scaffold or baseline verification reveals a red baseline and the CTO gave no special override.
-- P9 adjudication concludes there is no safe executable path that still respects the immutable spec, or that the immutable spec itself must change.
+- P9 adjudication concludes that the immutable spec itself must change before work can safely continue.
+- P9 adjudication cannot establish a safe executable path or binding execution overlay from current authoritative evidence.
 
 When this happens, raise an exception report with:
 
 - repo or worktree absolute path
 - immutable spec absolute path
 - immutable plan absolute path
+- drift adjudication ledger absolute path
 - current scope
 - exact blocked plan step or steps
 - adjudication summary
+- ledger entry id or ids
 - failing baseline commands
 - failing output summary
 - read-only evidence showing why the step is unexecutable or spec-drifting
 - why the workflow cannot safely continue
-- explicit statement that the plan is invalidated and must be reconverged from the immutable spec before execution resumes
+- explicit statement of which terminal state applies:
+  - `SPEC_RECONVERGENCE_REQUIRED`: the immutable spec must be reconverged first; any later plan or overlay must be derived again from the updated spec before execution resumes
+  - `ADJUDICATION_INSUFFICIENT_EVIDENCE`: authoritative evidence is not yet enough to establish a safe executable path or binding execution overlay
 
 ## Common Rationalizations
 
@@ -306,6 +367,8 @@ When this happens, raise an exception report with:
 | "The frozen plan outranks repo reality once execution starts" | No. The plan is derived coordination, not executability truth. Drift evidence must be adjudicated against spec plus actual repo or worktree evidence. |
 | "If code matches the spec but not the broken plan, reviewers should force it back to the plan" | No. Return plan drift evidence. P9 adjudicates; do not make spec-correct code worse to preserve a broken plan step. |
 | "Any proven wrong plan step means the workflow must terminate immediately" | No. First run the adjudication loop. Only stop if adjudication cannot establish a safe executable path that still respects the immutable spec. |
+| "I can just paste the adjudication into later prompts instead of writing a ledger entry" | No. Prompt carry-forward is not a durable artifact. Persist every adjudication in the drift ledger before later rounds continue. |
+| "If the investigator says spec reconvergence is required, that really means I should fix the plan" | No. `SPEC_RECONVERGENCE_REQUIRED` means the immutable spec must change first. The plan stays derived from that later spec decision. |
 
 ## Red Flags
 
@@ -319,7 +382,8 @@ When this happens, raise an exception report with:
 - Forgetting the compaction reminder or the original prompt preservation rule.
 - Skipping `verification-before-completion` or `finishing-a-development-branch`.
 - Forcing spec-correct code back toward a broken plan step instead of returning plan drift evidence for adjudication.
-- Jumping straight to terminal `PLAN_INVALIDATED` without running the adjudication loop.
+- Resuming a later round without the drift adjudication ledger or treating it as optional context.
+- Jumping straight to a terminal adjudication state without running the adjudication loop.
 - Keeping an unsatisfiable review loop running after adjudication already established that a frozen plan step is wrong.
 
 ## Completion

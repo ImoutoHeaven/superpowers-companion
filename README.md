@@ -152,6 +152,7 @@ It is designed for situations where:
 Its job is to:
 
 - enforce execution against immutable spec and plan documents
+- persist adjudicated plan drift in a worktree-local ledger so compaction and handoff do not re-litigate settled execution contracts
 - separate implementer, spec reviewer, and code reviewer responsibilities
 - keep the controller in an orchestration role instead of letting it become an ad hoc implementer
 - require review convergence before advancing task scopes
@@ -166,7 +167,7 @@ Use `execute-implementation-scope` only inside a `start-action` execution flow, 
 Its job is to:
 
 - execute one assigned scope against immutable spec and actual codebase reality
-- treat the frozen plan as derived coordination rather than co-equal truth
+- treat the drift adjudication ledger as the execution-stage overlay artifact and the frozen plan as derived coordination rather than co-equal truth
 - forbid silent route substitution when a frozen plan step is stale or wrong
 - return explicit `PLAN_DRIFT_EVIDENCE` when plan steps no longer fit spec or codebase truth
 
@@ -177,7 +178,7 @@ Use `review-spec-alignment` only inside a `start-action` execution flow, and onl
 Its job is to:
 
 - review immutable spec alignment first
-- treat the frozen plan as a derived guide whose validity must be checked after spec alignment
+- treat the drift adjudication ledger as binding workflow overlay state and the frozen plan as a derived guide whose validity must be checked after spec alignment
 - return explicit `PLAN_DRIFT_EVIDENCE` instead of forcing spec-correct code back toward a broken plan step
 
 ### `review-code-quality`
@@ -187,7 +188,7 @@ Use `review-code-quality` only inside a `start-action` execution flow, and only 
 Its job is to:
 
 - review correctness, regressions, tests, edge cases, and maintainability
-- remain aware that a frozen plan step may have become stale against actual codebase reality
+- remain aware that a frozen plan step may have become stale against actual codebase reality and may already be governed by the drift adjudication ledger
 - return explicit `PLAN_DRIFT_EVIDENCE` instead of silently passing split-brain into later stages
 
 ### `investigate-plan-drift`
@@ -196,9 +197,9 @@ Use `investigate-plan-drift` only inside a `start-action` adjudication loop, and
 
 Its job is to:
 
-- compare immutable spec, frozen plan, and actual codebase evidence
+- compare immutable spec, frozen plan, drift adjudication ledger, and actual codebase evidence
 - determine whether a frozen plan step is still executable as written
-- distinguish between safe continuation under adjudicated understanding and required doc reconvergence
+- distinguish between safe continuation under adjudicated understanding, required immutable spec reconvergence, and insufficient evidence
 
 ## Recommended Workflow
 
@@ -308,7 +309,7 @@ A few practical guidelines:
 3. Do not skip the spec-writing phase when the recap is still fuzzy; use `start-summary` only after the recap artifact is approved
 4. Treat this repository as a companion layer, not a standalone workflow system
 5. For frontend work with meaningful UI expectations, add `impeccable`
-6. Inside `start-action`, keep the truth hierarchy explicit: immutable spec first, actual codebase executability second, frozen plan as derived coordination only
+6. Inside `start-action`, keep the execution hierarchy explicit: immutable spec first, actual codebase executability second, drift adjudication ledger as durable workflow overlay, frozen plan as derived coordination only
 
 ## Design Principles
 
