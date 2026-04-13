@@ -72,7 +72,7 @@ Upstream: <https://github.com/pbakaus/impeccable>
 
 ## Included Skills
 
-This repository is intentionally small. At the moment it contains two skills.
+This repository is intentionally small. At the moment it contains six skills.
 
 ### `start-summary`
 
@@ -113,6 +113,47 @@ Its job is to:
 
 In short, `start-action` turns “the docs are ready” into “execution follows the docs under discipline.”
 
+### `execute-implementation-scope`
+
+Use `execute-implementation-scope` only inside a `start-action` execution flow, and only from the implementer subagent.
+
+Its job is to:
+
+- execute one assigned scope against immutable spec and actual codebase reality
+- treat the frozen plan as derived coordination rather than co-equal truth
+- forbid silent route substitution when a frozen plan step is stale or wrong
+- return explicit `PLAN_DRIFT_EVIDENCE` when plan steps no longer fit spec or codebase truth
+
+### `review-spec-alignment`
+
+Use `review-spec-alignment` only inside a `start-action` execution flow, and only from the spec reviewer subagent.
+
+Its job is to:
+
+- review immutable spec alignment first
+- treat the frozen plan as a derived guide whose validity must be checked after spec alignment
+- return explicit `PLAN_DRIFT_EVIDENCE` instead of forcing spec-correct code back toward a broken plan step
+
+### `review-code-quality`
+
+Use `review-code-quality` only inside a `start-action` execution flow, and only from the code reviewer subagent.
+
+Its job is to:
+
+- review correctness, regressions, tests, edge cases, and maintainability
+- remain aware that a frozen plan step may have become stale against actual codebase reality
+- return explicit `PLAN_DRIFT_EVIDENCE` instead of silently passing split-brain into later stages
+
+### `investigate-plan-drift`
+
+Use `investigate-plan-drift` only inside a `start-action` adjudication loop, and only from read-only investigation subagents.
+
+Its job is to:
+
+- compare immutable spec, frozen plan, and actual codebase evidence
+- determine whether a frozen plan step is still executable as written
+- distinguish between safe continuation under adjudicated understanding and required doc reconvergence
+
 ## Recommended Workflow
 
 This repository is most useful as part of a staged workflow like this:
@@ -123,6 +164,7 @@ This repository is most useful as part of a staged workflow like this:
 4. Produce and converge the implementation plan
 5. Once both documents are stable, run `start-action`
 6. Execute the work through a P9/controller-style orchestration flow
+7. Require each execution-stage subagent to load its own role-local workflow skill
 
 The value here is not that this repository adds lots of new skills. The value is that it makes the phase boundaries between upstream skills much more explicit.
 
@@ -143,6 +185,14 @@ The structure is intentionally minimal:
 
 ```text
 SKILLS/
+  execute-implementation-scope/
+    SKILL.md
+  investigate-plan-drift/
+    SKILL.md
+  review-code-quality/
+    SKILL.md
+  review-spec-alignment/
+    SKILL.md
   start-action/
     SKILL.md
   start-summary/
@@ -161,6 +211,10 @@ Project-level install:
 
 ```bash
 mkdir -p .opencode/skills
+cp -r SKILLS/execute-implementation-scope .opencode/skills/
+cp -r SKILLS/investigate-plan-drift .opencode/skills/
+cp -r SKILLS/review-code-quality .opencode/skills/
+cp -r SKILLS/review-spec-alignment .opencode/skills/
 cp -r SKILLS/start-action .opencode/skills/
 cp -r SKILLS/start-summary .opencode/skills/
 ```
@@ -169,11 +223,17 @@ Global install:
 
 ```bash
 mkdir -p ~/.config/opencode/skills
+cp -r SKILLS/execute-implementation-scope ~/.config/opencode/skills/
+cp -r SKILLS/investigate-plan-drift ~/.config/opencode/skills/
+cp -r SKILLS/review-code-quality ~/.config/opencode/skills/
+cp -r SKILLS/review-spec-alignment ~/.config/opencode/skills/
 cp -r SKILLS/start-action ~/.config/opencode/skills/
 cp -r SKILLS/start-summary ~/.config/opencode/skills/
 ```
 
 If you use another tool with a similar skill directory convention, the same approach applies: copy each skill folder, including its `SKILL.md`, into that tool's skill directory.
+
+If you plan to use `start-action`, install all six skills. `start-action` now requires the four role-local skills at execution time for its subagents.
 
 Before installing this repository, make sure the upstream dependencies you expect to use are already available, especially:
 
@@ -188,6 +248,7 @@ A few practical guidelines:
 2. Do not skip the spec-writing phase when the recap is still fuzzy; use `start-summary` first
 3. Treat this repository as a companion layer, not a standalone workflow system
 4. For frontend work with meaningful UI expectations, add `impeccable`
+5. Inside `start-action`, keep the truth hierarchy explicit: immutable spec first, actual codebase executability second, frozen plan as derived coordination only
 
 ## Design Principles
 
@@ -197,6 +258,7 @@ This repository follows a small set of straightforward principles:
 2. Build on upstream strengths instead of recreating them
 3. Freeze spec and plan before pushing execution forward
 4. Reduce ambiguity during implementation as much as possible
-5. Keep orchestration, implementation, and review responsibilities distinct
+5. Keep orchestration, implementation, investigation, and review responsibilities distinct
+6. Treat plan drift as evidence to adjudicate, not something to obey mechanically and not something to ignore quietly
 
 If you already use `pua` and `superpowers`, and you want a clearer operating path between “approved summary” and “disciplined execution,” that is exactly what `superpower-companion` is for.
