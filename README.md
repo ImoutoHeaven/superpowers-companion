@@ -110,8 +110,34 @@ Its job is to:
 - derive an implementation plan from the frozen spec
 - remove optional or ambiguous wording that would leave too much room for implementer interpretation
 - converge both documents through review before handoff
+- require each document-stage reviewer subagent to load its own role-local reviewer skill instead of relying only on controller-pasted review contracts
 
 In short, `start-summary` turns “we agreed on it” into “it is written down clearly enough to build.”
+
+Role-local reviewer skills for this phase are:
+
+- `review-start-summary-spec`
+- `review-start-summary-plan`
+
+### `review-start-summary-spec`
+
+Use `review-start-summary-spec` only inside a `start-summary` convergence flow, and only from the spec reviewer subagent.
+
+Its job is to:
+
+- review a mutable draft spec against the approved recap
+- re-establish artifact-based review after compaction or partial handoff
+- reject controller-prompt-only shortcuts during spec convergence
+
+### `review-start-summary-plan`
+
+Use `review-start-summary-plan` only inside a `start-summary` convergence flow, and only from the plan reviewer subagent.
+
+Its job is to:
+
+- review a mutable draft plan against the frozen spec and canonical `writing-plans`
+- keep the plan concrete without turning it into a copy-paste implementation transcript
+- re-establish artifact-based review after compaction or partial handoff
 
 ### `start-action`
 
@@ -181,8 +207,8 @@ This repository is most useful as part of a staged workflow like this:
 1. If the design is still open, start with `superpowers` `brainstorming`
 2. Once the discussion is settled but the recap is still loose, run `start-recap`
 3. Once you have an approved recap artifact, run `start-summary`
-4. Produce and freeze the spec
-5. Produce and converge the implementation plan
+4. Produce and converge the spec through the `start-summary` spec-reviewer skill
+5. Produce and converge the implementation plan through the `start-summary` plan-reviewer skill
 6. Once both documents are stable, run `start-action`
 7. Execute the work through a P9/controller-style orchestration flow
 8. Require each execution-stage subagent to load its own role-local workflow skill
@@ -212,6 +238,10 @@ SKILLS/
     SKILL.md
   review-code-quality/
     SKILL.md
+  review-start-summary-plan/
+    SKILL.md
+  review-start-summary-spec/
+    SKILL.md
   review-spec-alignment/
     SKILL.md
   start-recap/
@@ -222,7 +252,7 @@ SKILLS/
     SKILL.md
 ```
 
-That small footprint is deliberate. This repository should stay focused on orchestration skills rather than expanding into a broad skill collection.
+That footprint is still deliberate. This repository should stay focused on orchestration skills rather than expanding into a broad skill collection.
 
 ## Installation
 
@@ -237,6 +267,8 @@ mkdir -p .opencode/skills
 cp -r SKILLS/execute-implementation-scope .opencode/skills/
 cp -r SKILLS/investigate-plan-drift .opencode/skills/
 cp -r SKILLS/review-code-quality .opencode/skills/
+cp -r SKILLS/review-start-summary-plan .opencode/skills/
+cp -r SKILLS/review-start-summary-spec .opencode/skills/
 cp -r SKILLS/review-spec-alignment .opencode/skills/
 cp -r SKILLS/start-recap .opencode/skills/
 cp -r SKILLS/start-action .opencode/skills/
@@ -250,6 +282,8 @@ mkdir -p ~/.config/opencode/skills
 cp -r SKILLS/execute-implementation-scope ~/.config/opencode/skills/
 cp -r SKILLS/investigate-plan-drift ~/.config/opencode/skills/
 cp -r SKILLS/review-code-quality ~/.config/opencode/skills/
+cp -r SKILLS/review-start-summary-plan ~/.config/opencode/skills/
+cp -r SKILLS/review-start-summary-spec ~/.config/opencode/skills/
 cp -r SKILLS/review-spec-alignment ~/.config/opencode/skills/
 cp -r SKILLS/start-recap ~/.config/opencode/skills/
 cp -r SKILLS/start-action ~/.config/opencode/skills/
@@ -258,7 +292,7 @@ cp -r SKILLS/start-summary ~/.config/opencode/skills/
 
 If you use another tool with a similar skill directory convention, the same approach applies: copy each skill folder, including its `SKILL.md`, into that tool's skill directory.
 
-If you plan to use the full document-driven workflow, install all seven skills. `start-action` itself still requires the four role-local skills at execution time for its subagents.
+If you plan to use the full document-driven workflow, install all nine skills. `start-summary` requires the two role-local reviewer skills during document convergence, and `start-action` still requires the four role-local skills at execution time for its subagents.
 
 Before installing this repository, make sure the upstream dependencies you expect to use are already available, especially:
 
