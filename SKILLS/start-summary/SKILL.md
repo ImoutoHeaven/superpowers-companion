@@ -1,6 +1,6 @@
 ---
 name: start-summary
-description: Use when a final conversation summary or design recap must become concrete spec and implementation plan documents for downstream engineers, especially when optional or ambiguous wording would leave implementers too much freedom.
+description: Use when an approved final recap artifact must become concrete spec and implementation plan documents for downstream engineers, especially when optional or ambiguous wording would leave implementers too much freedom.
 ---
 
 # Start Summary
@@ -11,16 +11,19 @@ Turn the last approved summary or design recap into two on-disk documents in two
 
 ## When to Use
 
-- The conversation already ended with a final summary or design recap.
+- The conversation already ended with an approved final recap artifact or equivalent design recap.
 - Another engineer is blocked on written docs.
 - The task is to produce a spec and a plan, not to implement code yet.
 - Ambiguity, optionality, or "implementer choice" would be harmful.
 
 Do not use this skill when the design is still unsettled. That is a brainstorming problem, not a start-summary problem.
 
+Do not use this skill when the discussion is settled but the recap is still ad hoc, loose, or not yet approved as a durable handoff artifact. Use `start-recap` first.
+
 ## Required Skills
 
 - `writing-plans` is mandatory.
+- If the recap is not yet written and approved as a deterministic handoff artifact, use `start-recap` first.
 - Do not invoke `brainstorming` again just because the upstream material came from a design discussion. The final recap is already the approved design input.
 
 ## Core Rules

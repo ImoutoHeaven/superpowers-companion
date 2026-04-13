@@ -2,7 +2,7 @@
 
 `superpower-companion` is a small skill library that sits on top of `pua` and `superpowers` and adds a tighter orchestration layer between them.
 
-It is not trying to replace either upstream project. It is not a general-purpose skill platform. It is a focused companion library for teams that already like the `pua` and `superpowers` ecosystems, but want a clearer workflow from recap to spec and plan, then from frozen docs to controlled execution.
+It is not trying to replace either upstream project. It is not a general-purpose skill platform. It is a focused companion library for teams that already like the `pua` and `superpowers` ecosystems, but want a clearer workflow from settled discussion to approved recap, then from recap to spec and plan, then from frozen docs to controlled execution.
 
 ## What This Repository Is
 
@@ -25,6 +25,7 @@ The upstream libraries are already strong. The gap this repository tries to clos
 
 Common situations that motivated this library:
 
+- You already finished the design discussion, but you still need a deterministic recap artifact before spec and plan writing
 - You already have an approved recap, but you still need a clean way to turn it into a concrete spec and implementation plan
 - You already have a spec and a plan, but you want a stricter P9-style controller workflow for execution
 - You want to reduce drift during implementation, especially when agents tend to reopen design questions, reinterpret the plan, or report partial progress too early
@@ -72,7 +73,26 @@ Upstream: <https://github.com/pbakaus/impeccable>
 
 ## Included Skills
 
-This repository is intentionally small. At the moment it contains six skills.
+This repository is intentionally small. At the moment it contains seven skills.
+
+### `start-recap`
+
+Use `start-recap` when the design discussion is already settled, but the recap that should feed the next documentation phase is still ad hoc, fuzzy, or dependent on agent judgment.
+
+It is designed for situations where:
+
+- brainstorming is done, but there is no durable recap artifact yet
+- multiple messages changed the scope or design over time
+- another agent will need one approved handoff instead of reconstructing intent from raw chat history
+
+Its job is to:
+
+- turn the settled discussion into one approved recap artifact
+- classify confirmed decisions, resolved conflicts, locked assumptions, and real open questions
+- build the context packet fields that `start-summary` needs next
+- stop agents from jumping straight from brainstorming to plan writing with a loose summary
+
+In short, `start-recap` turns “we stopped discussing” into “the approved recap is engineered and ready for spec convergence.”
 
 ### `start-summary`
 
@@ -159,12 +179,13 @@ Its job is to:
 This repository is most useful as part of a staged workflow like this:
 
 1. If the design is still open, start with `superpowers` `brainstorming`
-2. Once you have a final approved recap, run `start-summary`
-3. Produce and freeze the spec
-4. Produce and converge the implementation plan
-5. Once both documents are stable, run `start-action`
-6. Execute the work through a P9/controller-style orchestration flow
-7. Require each execution-stage subagent to load its own role-local workflow skill
+2. Once the discussion is settled but the recap is still loose, run `start-recap`
+3. Once you have an approved recap artifact, run `start-summary`
+4. Produce and freeze the spec
+5. Produce and converge the implementation plan
+6. Once both documents are stable, run `start-action`
+7. Execute the work through a P9/controller-style orchestration flow
+8. Require each execution-stage subagent to load its own role-local workflow skill
 
 The value here is not that this repository adds lots of new skills. The value is that it makes the phase boundaries between upstream skills much more explicit.
 
@@ -193,6 +214,8 @@ SKILLS/
     SKILL.md
   review-spec-alignment/
     SKILL.md
+  start-recap/
+    SKILL.md
   start-action/
     SKILL.md
   start-summary/
@@ -215,6 +238,7 @@ cp -r SKILLS/execute-implementation-scope .opencode/skills/
 cp -r SKILLS/investigate-plan-drift .opencode/skills/
 cp -r SKILLS/review-code-quality .opencode/skills/
 cp -r SKILLS/review-spec-alignment .opencode/skills/
+cp -r SKILLS/start-recap .opencode/skills/
 cp -r SKILLS/start-action .opencode/skills/
 cp -r SKILLS/start-summary .opencode/skills/
 ```
@@ -227,13 +251,14 @@ cp -r SKILLS/execute-implementation-scope ~/.config/opencode/skills/
 cp -r SKILLS/investigate-plan-drift ~/.config/opencode/skills/
 cp -r SKILLS/review-code-quality ~/.config/opencode/skills/
 cp -r SKILLS/review-spec-alignment ~/.config/opencode/skills/
+cp -r SKILLS/start-recap ~/.config/opencode/skills/
 cp -r SKILLS/start-action ~/.config/opencode/skills/
 cp -r SKILLS/start-summary ~/.config/opencode/skills/
 ```
 
 If you use another tool with a similar skill directory convention, the same approach applies: copy each skill folder, including its `SKILL.md`, into that tool's skill directory.
 
-If you plan to use `start-action`, install all six skills. `start-action` now requires the four role-local skills at execution time for its subagents.
+If you plan to use the full document-driven workflow, install all seven skills. `start-action` itself still requires the four role-local skills at execution time for its subagents.
 
 Before installing this repository, make sure the upstream dependencies you expect to use are already available, especially:
 
@@ -245,10 +270,11 @@ Before installing this repository, make sure the upstream dependencies you expec
 A few practical guidelines:
 
 1. Do not use `start-action` while the design is still moving
-2. Do not skip the spec-writing phase when the recap is still fuzzy; use `start-summary` first
-3. Treat this repository as a companion layer, not a standalone workflow system
-4. For frontend work with meaningful UI expectations, add `impeccable`
-5. Inside `start-action`, keep the truth hierarchy explicit: immutable spec first, actual codebase executability second, frozen plan as derived coordination only
+2. Do not skip the recap-writing phase when the handoff is still fuzzy; use `start-recap` first
+3. Do not skip the spec-writing phase when the recap is still fuzzy; use `start-summary` only after the recap artifact is approved
+4. Treat this repository as a companion layer, not a standalone workflow system
+5. For frontend work with meaningful UI expectations, add `impeccable`
+6. Inside `start-action`, keep the truth hierarchy explicit: immutable spec first, actual codebase executability second, frozen plan as derived coordination only
 
 ## Design Principles
 
