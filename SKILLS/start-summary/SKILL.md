@@ -47,13 +47,14 @@ Do not use this skill when the discussion is settled but the recap is still ad h
 12. If later implementation proves that a frozen plan step is actually unexecutable against the real codebase, or executable only by drifting from the frozen spec, treat that as plan drift evidence. The downstream lead must investigate and adjudicate against the frozen spec plus actual codebase evidence instead of mechanically following the broken step.
 13. Plan concreteness means no ambiguity about behavior, intended implementation surface, contract changes, sequencing, or verification. Name concrete file paths when must-read repo evidence already supports them. If repo evidence still leaves multiple plausible placements, name the relevant code area or boundary instead of inventing one brittle exact route.
 14. When the plan uses code, function, or test snippets to satisfy `writing-plans`, keep them at behavior, API, contract, and assertion level: inputs, outputs, public types, required call ordering, required assertions, and verification targets. Do not turn them into copy-paste full function definitions, helper internals, unrelated implementation details, or one brittle local route unless the frozen spec or must-read repo evidence makes that detail necessary for executability.
-15. The spec fixes product goals, scope, behavior, and acceptance criteria. The plan fixes intended implementation surface, API and data-contract decisions, sequencing, and verification. `writing-plans` fixes the plan's required structure and section types. Local code structure and helper detail belong to implementation and later review unless the frozen spec or must-read repo evidence forces them earlier.
-16. Until the plan reviewer returns `PASS`, the plan is still a mutable draft.
-17. Once the plan passes, it becomes immutable.
-18. Final reporting must include the absolute spec path and the absolute plan path.
-19. Every `start-summary` reviewer subagent must invoke its role-local reviewer skill before acting, and must re-invoke that same role-local skill after compaction if loaded-skill memory is lost.
-20. The controller's pasted reviewer contract is required round context, not the reviewer's sole authority and not a substitute for the role-local reviewer skill.
-21. Do not substitute `review-spec-alignment` or `review-code-quality` here. Those skills review implemented scopes in `start-action`, not mutable draft docs in `start-summary`.
+15. In plan review, the ban on full detailed copy-paste transcript detail has priority over any broad reading of `no ambiguity`. Reviewers must remove coordination ambiguity without demanding transcript-level implementation detail.
+16. The spec fixes product goals, scope, behavior, and acceptance criteria. The plan fixes intended implementation surface, API and data-contract decisions, sequencing, and verification. `writing-plans` fixes the plan's required structure and section types. Local code structure and helper detail belong to implementation and later review unless the frozen spec or must-read repo evidence forces them earlier.
+17. Until the plan reviewer returns `PASS`, the plan is still a mutable draft.
+18. Once the plan passes, it becomes immutable.
+19. Final reporting must include the absolute spec path and the absolute plan path.
+20. Every `start-summary` reviewer subagent must invoke its role-local reviewer skill before acting, and must re-invoke that same role-local skill after compaction if loaded-skill memory is lost.
+21. The controller's pasted reviewer contract is required round context, not the reviewer's sole authority and not a substitute for the role-local reviewer skill.
+22. Do not substitute `review-spec-alignment` or `review-code-quality` here. Those skills review implemented scopes in `start-action`, not mutable draft docs in `start-summary`.
 
 ## Default Paths
 
@@ -121,6 +122,7 @@ The plan must be executable by a little-context engineer. Remove ambiguity about
 The only plan-shape delta this skill adds is:
 
 - Keep code, function, and test snippets at behavior, public API, data-contract, assertion, and verification level.
+- Comments, logic-flow bullets, API skeletons, contract tables, assertion skeletons, and verification matrices are valid plan representations when they lock behavior and verification intent without overfreezing local implementation internals.
 - Do not let those sections drift into gratuitous full function definitions, full test definitions, helper internals, or unrelated implementation detail unless the frozen spec or must-read repo evidence makes that detail necessary for executability.
 - Name concrete file paths when actual codebase evidence already supports them; otherwise name the relevant code area or boundary without freezing a brittle exact route.
 - `TASK_GROUP` or `TASK_CHUNK` is mandatory in this workflow as the orchestration layer above the underlying `writing-plans` task scaffold. Do not replace, flatten, or redefine that scaffold here.
@@ -217,11 +219,13 @@ Every message to the plan reviewer must fully include:
   7. Treat `writing-plans` as the canonical source of truth for required plan format and section types. If the plan omits required `writing-plans` sections or silently rewrites that scaffold, return `CHANGES_REQUIRED`.
   8. Require concrete file paths when must-read repo evidence already supports them. If the repo still leaves multiple plausible placements, require the plan to name the relevant code area or boundary instead of freezing one brittle exact route.
   9. Judge code, function, and test sections by whether they lock API and contract behavior, inputs and outputs, required assertions, and verification intent. Judge command sections against `writing-plans` exact-command expectation; do not relax command exactness here.
-  10. If the plan includes gratuitous full function definitions, full test definitions, helper internals, or unrelated implementation detail that the frozen spec and must-read repo evidence do not require, return `CHANGES_REQUIRED`.
-  11. Do not require the plan to freeze exact helper names, function bodies, helper internals, or one exact file route unless the frozen spec or must-read repo evidence makes that detail necessary for executability.
-  12. If a plan step depends on repo assumptions that are not supported by the must-read files, or would require spec drift if implemented literally, return `CHANGES_REQUIRED`; do not reinterpret the spec to save the plan. At `start-summary` stage this is a blocking draft defect that must be fixed before `PASS`; if the same defect survives into a frozen plan later, it becomes plan drift evidence for downstream adjudication.
-  13. Return all findings in one pass. Do not drip-feed one finding at a time.
-  14. Return exactly `CHANGES_REQUIRED|PASS`, `SUGGEST_CHANGES`, and `RATIONALE`.
+  10. Treat comments, logic-flow bullets, API skeletons, contract tables, assertion skeletons, and verification matrices as valid plan representations when they lock behavior, interfaces, sequencing, assertions, and verification intent.
+  11. If the plan includes gratuitous full function definitions, full test definitions, helper internals, or unrelated implementation detail that the frozen spec and must-read repo evidence do not require, return `CHANGES_REQUIRED`.
+  12. Do not require the plan to freeze exact helper names, function bodies, helper internals, one exact file route, or transcript-level local wiring unless the frozen spec or must-read repo evidence makes that detail necessary for executability.
+  13. The ban on full detailed copy-paste transcript plans has priority over any broad reading of `no ambiguity`. Remove coordination ambiguity, but preserve valid local implementation latitude.
+  14. If a plan step depends on repo assumptions that are not supported by the must-read files, or would require spec drift if implemented literally, return `CHANGES_REQUIRED`; do not reinterpret the spec to save the plan. At `start-summary` stage this is a blocking draft defect that must be fixed before `PASS`; if the same defect survives into a frozen plan later, it becomes plan drift evidence for downstream adjudication.
+  15. Return all findings in one pass. Do not drip-feed one finding at a time.
+  16. Return exactly `CHANGES_REQUIRED|PASS`, `SUGGEST_CHANGES`, and `RATIONALE`.
 
 Recommended prompt skeleton:
 
@@ -250,11 +254,13 @@ Review requirements:
 7. Treat writing-plans as the canonical source of truth for required plan format and section types. If the plan omits required writing-plans sections or silently rewrites that scaffold, return CHANGES_REQUIRED.
 8. Require concrete file paths when must-read repo evidence already supports them. If the repo still leaves multiple plausible placements, require the plan to name the relevant code area or boundary instead of freezing one brittle exact route.
 9. Judge code, function, and test sections by whether they lock API and contract behavior, inputs and outputs, required assertions, and verification intent. Judge command sections against writing-plans exact-command expectation; do not relax command exactness here.
-10. If the plan includes gratuitous full function definitions, full test definitions, helper internals, or unrelated implementation detail that the frozen spec and must-read repo evidence do not require, return CHANGES_REQUIRED.
-11. Do not require the plan to freeze exact helper names, function bodies, helper internals, or one exact file route unless the frozen spec or must-read repo evidence makes that detail necessary for executability.
-12. If a plan step depends on repo assumptions that are not supported by the must-read files, or would require spec drift if implemented literally, return CHANGES_REQUIRED; do not reinterpret the spec to save the plan. At start-summary stage this is a blocking draft defect that must be fixed before PASS; if the same defect survives into a frozen plan later, it becomes plan drift evidence for downstream adjudication.
-13. Return all findings in one pass.
-14. Return exactly:
+10. Treat comments, logic-flow bullets, API skeletons, contract tables, assertion skeletons, and verification matrices as valid plan representations when they lock behavior, interfaces, sequencing, assertions, and verification intent.
+11. If the plan includes gratuitous full function definitions, full test definitions, helper internals, or unrelated implementation detail that the frozen spec and must-read repo evidence do not require, return CHANGES_REQUIRED.
+12. Do not require the plan to freeze exact helper names, function bodies, helper internals, one exact file route, or transcript-level local wiring unless the frozen spec or must-read repo evidence makes that detail necessary for executability.
+13. The ban on full detailed copy-paste transcript plans has priority over any broad reading of no ambiguity. Remove coordination ambiguity, but preserve valid local implementation latitude.
+14. If a plan step depends on repo assumptions that are not supported by the must-read files, or would require spec drift if implemented literally, return CHANGES_REQUIRED; do not reinterpret the spec to save the plan. At start-summary stage this is a blocking draft defect that must be fixed before PASS; if the same defect survives into a frozen plan later, it becomes plan drift evidence for downstream adjudication.
+15. Return all findings in one pass.
+16. Return exactly:
    - CHANGES_REQUIRED|PASS
    - SUGGEST_CHANGES
    - RATIONALE
@@ -316,6 +322,9 @@ Do not carry the ambiguous wording into the final docs.
 | "If the role-local reviewer skill is unavailable in the environment, the reviewer should silently fall back to prompt-only review" | No. Surface the workflow mismatch explicitly instead of silently downgrading the review model. |
 | "Optional wording is fine because the implementer is smart" | Smart implementers still diverge when behavior, scope, contracts, sequencing, or verification stay ambiguous. Remove that ambiguity. |
 | "No optional wording means I should freeze exact helper names, code bodies, full test definitions, or one file route" | No. Remove coordination ambiguity without turning the plan into a code transcript. Preserve repo-local implementation latitude unless the frozen spec or repo evidence requires a specific route. |
+| "No ambiguity means every plan step needs near-final code snippets" | No. Remove coordination ambiguity without collapsing the draft into transcript-level implementation detail. |
+| "Comments, logic flow, or contract tables are ambiguous unless replaced with full code" | Not always. They are valid when they lock behavior, interfaces, sequencing, required assertions, and verification intent. |
+| "I should keep asking for more detail until no local implementation choice remains" | No. Preserve valid local implementation latitude unless the frozen spec or must-read repo evidence forces one route. |
 | "To avoid drift, I should remove code or test snippets from the plan entirely" | No. Respect `writing-plans` format. Keep snippets, but keep them at API, contract, assertion, and verification level instead of full implementation level. |
 | "`writing-plans` asks for code and test snippets, so I should paste full function and test definitions" | No. Satisfy the format with snippets that lock behavior, inputs, outputs, public API, required assertions, and verification intent. Helpers and unrelated implementation detail belong to execution and review unless earlier truth forces them. |
 | "A plan without inline code or test sections can still pass because we only care about contract level" | No. Required `writing-plans` sections must still be present. The override is semantic level, not section removal. |
@@ -339,12 +348,14 @@ Do not carry the ambiguous wording into the final docs.
 - Reusing `review-spec-alignment` or `review-code-quality` inside `start-summary`.
 - Inheriting a prior reviewer's "close to PASS" posture after compaction or partial handoff instead of re-establishing the evidence chain.
 - Letting a reviewer silently degrade to prompt-only review because role-local skill invocation failed.
+- Treating valid implementation latitude as unresolved review ambiguity.
 - Editing the spec after declaring it immutable.
 - Returning relative paths only.
 - Leaving `optional` or similar wording in either final document.
 - Removing code, function, or test sections that `writing-plans` requires instead of constraining their semantic level.
 - Rejecting a spec-aligned plan only because it does not include literal code snippets, full test bodies, or frozen helper names.
 - Converging the plan into copy-paste full function definitions, helper internals, or full test definitions that the frozen spec and repo evidence do not require.
+- Repeating "still ambiguous" findings that disappear only when the plan is forced into transcript-level detail.
 - Freezing local code-level choices that the frozen spec does not require and the must-read repo evidence does not force.
 - Treating the frozen plan as a second point of truth equal to the frozen spec.
 - Leaving no downstream rule for investigation and adjudication when real codebase analysis disproves a frozen plan step.

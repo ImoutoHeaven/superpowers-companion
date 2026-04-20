@@ -136,7 +136,8 @@ Use `review-start-summary-plan` only inside a `start-summary` convergence flow, 
 Its job is to:
 
 - review a mutable draft plan against the frozen spec and canonical `writing-plans`
-- keep the plan concrete without turning it into a copy-paste implementation transcript
+- keep the plan concrete by removing coordination ambiguity while explicitly forbidding transcript-level copy-paste detail
+- require reviewers to accept comment-level, logic-flow, and contract-level representations when they preserve executability without overfreezing implementation internals
 - re-establish artifact-based review after compaction or partial handoff
 
 ### `start-action`

@@ -11,6 +11,21 @@ Review one mutable draft implementation plan inside `start-summary`. This skill 
 
 Your job is to converge the draft plan from the frozen spec into a concrete coordination document that still respects `writing-plans` as the canonical source of plan format. The controller prompt supplies round-specific context. It does not replace this role-local skill.
 
+## Detail Boundary And Priority
+
+Plan review in this phase removes coordination ambiguity. It does not eliminate all local implementation latitude.
+
+Apply this priority order when requirements appear to conflict:
+
+1. Preserve alignment with the frozen spec.
+2. Preserve `writing-plans` required scaffold and section contract.
+3. Remove blocking ambiguity about implementation surface, contract changes, sequencing, verification, and required evidence.
+4. Preserve multiple valid local implementations unless the frozen spec or must-read repo evidence forces one exact route.
+
+`No ambiguity` means no coordination ambiguity. It does not authorize transcript-level copy-paste implementation detail.
+
+If your interpretation of `no ambiguity` would require full detailed copy-paste transcript content, that interpretation is wrong. Reject the interpretation, not the draft.
+
 ## When To Use
 
 - You were dispatched by `start-summary` as the plan reviewer.
@@ -47,6 +62,7 @@ If any authoritative input is missing, stale, or only implied from partial hando
    - ambiguity around implementation surface, contract changes, sequencing, or verification
    - whether file paths are concrete when repo evidence supports them, or properly scoped to a code area when it does not
    - whether the plan overfreezes helper names, full function bodies, helper internals, or unrelated implementation detail
+   - whether the draft uses valid coordination-level representations (for example comments, logic-flow bullets, API skeletons, contract tables, assertion skeletons, or verification matrices) when those forms keep behavior and verification executable without overfreezing local internals
 7. Return all blocking findings in one pass.
 
 ## Quick Reference
@@ -65,7 +81,9 @@ Return exactly:
 - `SUGGEST_CHANGES`
 - `RATIONALE`
 
-Use `CHANGES_REQUIRED` if any blocking ambiguity remains, the plan conflicts with the frozen spec, the plan silently rewrites `writing-plans`, the plan freezes the wrong level of detail, or the authoritative inputs are incomplete for this round.
+Use `CHANGES_REQUIRED` if any blocking ambiguity remains, the plan conflicts with the frozen spec, the plan silently rewrites `writing-plans`, the plan freezes the wrong level of detail, the plan omits enough coordination detail to be executable, or the authoritative inputs are incomplete for this round.
+
+Do not use `CHANGES_REQUIRED` merely because the draft preserves multiple valid local implementations via comments, logic flow, API skeletons, contract tables, assertion skeletons, or verification-focused examples.
 
 In `SUGGEST_CHANGES`, list every required edit or missing authoritative input in one pass.
 
@@ -86,6 +104,10 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 - Do not let the plan become a second point of truth over the frozen spec.
 - Do not remove required `writing-plans` sections just because the plan stays at contract level.
 - Do not force exact helper names, full function bodies, helper internals, or one brittle file route unless the frozen spec or repo evidence requires them.
+- Do not use `no ambiguity` as a reason to demand full function bodies, helper internals, full test bodies, or transcript-level local wiring.
+- Do not reject a plan only because it uses comments, logic flow, API skeletons, contract tables, assertion skeletons, or verification matrices instead of near-final implementation snippets.
+- Do not iterate the plan toward full detailed copy-paste transcript detail when the remaining variance is local implementation latitude rather than coordination ambiguity.
+- Treat the ban on full detailed copy-paste transcript plans as a higher-priority guardrail than any broad reading of `no ambiguity`.
 - Do not use `review-code-quality` or `review-spec-alignment` as shortcuts. They belong to `start-action`, not `start-summary`.
 - Do not silently downgrade to prompt-only review if role-local skill invocation fails in the environment. Surface the mismatch instead.
 
@@ -97,6 +119,9 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 | "Round 2 or 3 means I only need to check the deltas" | No. Prior findings are hints. Re-read the frozen spec, current plan, and canonical `writing-plans` every round. |
 | "The controller restated everything after compaction, so that pasted contract is now the live authority" | No. Treat the restated contract as current-round input, not as a replacement for the role-local skill. |
 | "A contract-level plan can omit some `writing-plans` sections" | No. The semantic level changes. The required scaffold stays. |
+| "No ambiguous wording means every code step must include near-final code" | No. Remove coordination ambiguity without collapsing the plan into transcript-level implementation detail. |
+| "Comments, logic flow, or contract tables are still ambiguous unless replaced with full code" | Not always. They are valid when they lock behavior, interfaces, sequencing, assertions, and verification intent. |
+| "I should keep requesting more detail until no local implementation choice remains" | No. Preserve valid local implementation latitude unless the frozen spec or repo evidence forces one route. |
 | "`review-code-quality` or `review-spec-alignment` are close enough" | No. Those skills review implemented scopes inside `start-action`, not mutable draft plans inside `start-summary`. |
 | "If some authoritative input is missing, I should still give the best review I can" | No. Return `CHANGES_REQUIRED` and request the missing authoritative inputs explicitly. |
 
@@ -107,11 +132,14 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 - You are checking only the latest deltas without re-reading the authoritative artifacts.
 - You are treating the frozen plan as co-equal truth with the frozen spec.
 - You are pushing the plan into a copy-paste implementation transcript.
+- You are treating implementation latitude as reviewable ambiguity.
+- You are repeating "still ambiguous" findings that would disappear only if the plan became a transcript.
 
 ## Common Mistakes
 
 - Checking only the latest deltas without re-reading the frozen spec and canonical `writing-plans`.
 - Treating contract-level planning as permission to drop required `writing-plans` sections.
+- Treating comment-level or logic-flow-level planning as automatically insufficient even when behavior and verification are fully locked.
 - Continuing silently when the role-local skill is unavailable instead of surfacing the workflow mismatch.
 
 ## Bottom Line
