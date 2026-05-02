@@ -1,6 +1,6 @@
 ---
 name: start-summary
-description: Use when an approved final recap artifact must become concrete spec and implementation plan documents for downstream engineers, especially when optional or ambiguous wording would leave product behavior, task scope, or verification open to interpretation.
+description: Use when a main agent with subagent-dispatch capability sees compaction or handoff notes with an approved recap or final design summary that must become reviewed immutable spec and frozen implementation plan documents.
 ---
 
 # Start Summary
@@ -8,6 +8,20 @@ description: Use when an approved final recap artifact must become concrete spec
 ## Overview
 
 Turn the last approved summary or design recap into two on-disk documents in two locked phases: converge the spec first, freeze it, re-read the frozen spec fresh, then derive and converge the implementation plan from that immutable spec. Do not reopen brainstorming. Do not leave optional wording about product behavior, scope, contracts, sequencing, or verification. Use one persistent reviewer session for the spec and one persistent reviewer session for the plan until each passes. The frozen plan is a derived coordination document, not a second point of truth equal to the frozen spec.
+
+## Compaction And Handoff Trigger
+
+If you are a fresh main agent or orchestration worker resuming from compaction or handoff notes, invoke `start-summary` before writing docs or choosing another planning skill when all of these are true:
+
+- The notes mention an approved recap, final recap, settled design summary, or equivalent durable design handoff.
+- The notes say no immutable spec exists yet, no frozen implementation plan exists yet, or the next work is to create/converge those documents.
+- The notes describe writing, reviewing, freezing, or converging a spec and implementation plan for downstream execution.
+- You have platform-level ability to dispatch subagents.
+- You were not explicitly dispatched as spec-reviewer-only, plan-reviewer-only, implementer-only, or fixer-only.
+
+The handoff's `next steps` are document-convergence workflow state. Do not reopen brainstorming, invoke `writing-plans` directly, or start implementation before loading `start-summary`.
+
+If the notes already contain both a frozen immutable spec and a frozen implementation plan and the next work is code execution, use `start-action` instead. If you are role-only, do not invoke `start-summary`; use the role-local skill named by your dispatch.
 
 ## When to Use
 
@@ -333,10 +347,13 @@ Do not carry the ambiguous wording into the final docs.
 | "I'll only fix the major findings and ignore the rest" | The reviewer must report all findings in one pass and you must resolve them before `PASS`. |
 | "Once the plan passes, it becomes co-equal truth with the spec" | No. The plan is a derived coordination document. The frozen spec remains the product truth. |
 | "If later codebase reality disproves a frozen plan step, implementation should still follow the plan" | No. Treat that as plan drift evidence. The downstream lead must adjudicate against the frozen spec and actual codebase truth. |
+| "The handoff says to write the spec and plan, so I can invoke `writing-plans` directly" | No. A main agent with dispatch capability must reload `start-summary` first so spec-first convergence and reviewer sessions survive compaction. |
+| "The recap is clear enough, so I can skip the start-summary workflow" | No. An approved recap without frozen spec and plan is exactly the handoff signal for `start-summary`. |
 
 ## Red Flags
 
 - Reopening brainstorming instead of distilling the approved recap.
+- Resuming from compaction or handoff notes with an approved recap and missing spec or plan but invoking `writing-plans` directly before `start-summary`.
 - Drafting any `TASK_GROUP`, `TASK`, `STEP`, or tentative task outline before the spec passes and freezes.
 - Writing the plan before the spec passes.
 - Using more than one spec reviewer session.

@@ -1,6 +1,6 @@
 ---
 name: start-action
-description: Use when acting as a P9 tech lead who must execute an immutable spec-and-plan workflow through subagents only, especially when the work requires worktrees, review loops, checkpoint commits, squash review, and no partial progress reports.
+description: Use when a main agent with subagent-dispatch capability sees compaction or handoff notes for implementation using an immutable spec, frozen plan, drift adjudication ledger, worktree, reviewer fixes, checkpoint commits, or final review.
 ---
 
 # Start Action
@@ -8,6 +8,21 @@ description: Use when acting as a P9 tech lead who must execute an immutable spe
 ## Overview
 
 Run implementation as a P9 controller from immutable spec and plan documents. You do not write code yourself. Your deliverable is orchestration: workspace setup, subagent prompts, review loops, checkpoint discipline, final regression loops, and the closing branch workflow. The immutable plan is a derived coordination document, not a second source of truth over the spec or the real codebase. During execution, P9 must also maintain one worktree-local drift adjudication ledger as the durable execution-stage overlay artifact for already-adjudicated plan drift.
+
+## Compaction And Handoff Trigger
+
+If you are a fresh main agent, P9/team lead, or orchestration worker resuming from compaction or handoff notes, invoke `start-action` before choosing any implementation, debugging, review, or finishing skill when all of these are true:
+
+- The notes mention an immutable spec or frozen spec.
+- The notes mention a frozen implementation plan or immutable plan.
+- The notes mention a drift adjudication ledger, active drift entry, checkpoint commit, worktree execution state, unresolved reviewer findings, final review, or branch-finishing work.
+- The notes describe continuing implementation, fixing reviewer findings, re-reviewing a scope, checkpointing, squash review, regression review, or finishing a branch.
+- You have platform-level ability to dispatch subagents.
+- You were not explicitly dispatched as reviewer-only, implementer-only, fix-only, or drift-investigator-only.
+
+The handoff's `next steps` are workflow state, not permission for the main agent to edit code, run `systematic-debugging`, invoke `execute-implementation-scope`, invoke `subagent-driven-development` directly, or invoke `finishing-a-development-branch` first. Load `start-action` first so the P9 controller workflow decides the next role-local subagent action.
+
+If you are role-only, do not invoke `start-action`. Use the role-local skill named by your dispatch instead.
 
 ## Required Skills
 
@@ -369,6 +384,9 @@ When this happens, raise an exception report with:
 | "Any proven wrong plan step means the workflow must terminate immediately" | No. First run the adjudication loop. Only stop if adjudication cannot establish a safe executable path that still respects the immutable spec. |
 | "I can just paste the adjudication into later prompts instead of writing a ledger entry" | No. Prompt carry-forward is not a durable artifact. Persist every adjudication in the drift ledger before later rounds continue. |
 | "If the investigator says spec reconvergence is required, that really means I should fix the plan" | No. `SPEC_RECONVERGENCE_REQUIRED` means the immutable spec must change first. The plan stays derived from that later spec decision. |
+| "The handoff says next steps are to fix reviewer findings, so I should start with debugging or implementation skills" | No. A main agent with dispatch capability must reload `start-action` first; the next steps are P9 workflow state for subagents. |
+| "This is almost done, so I should invoke finishing-a-development-branch" | No. Final review findings, unresolved fixes, or missing regression convergence mean the `start-action` workflow is still active. |
+| "I see spec, plan, ledger, and worktree paths, so I can continue from the notes without reloading the workflow" | No. Those are the compaction signals that require `start-action`. |
 
 ## Red Flags
 
@@ -383,6 +401,7 @@ When this happens, raise an exception report with:
 - Skipping `verification-before-completion` or `finishing-a-development-branch`.
 - Forcing spec-correct code back toward a broken plan step instead of returning plan drift evidence for adjudication.
 - Resuming a later round without the drift adjudication ledger or treating it as optional context.
+- Resuming from compaction or handoff notes with immutable spec, frozen plan, and drift ledger signals but invoking `subagent-driven-development`, `execute-implementation-scope`, `systematic-debugging`, or `finishing-a-development-branch` before `start-action`.
 - Jumping straight to a terminal adjudication state without running the adjudication loop.
 - Keeping an unsatisfiable review loop running after adjudication already established that a frozen plan step is wrong.
 

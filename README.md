@@ -98,6 +98,8 @@ In short, `start-recap` turns “we stopped discussing” into “the approved r
 
 Use `start-summary` when the conversation already ended in an approved recap, summary, or design conclusion, and you need to turn that into durable execution documents.
 
+Fresh-agent resume rule: if compaction or handoff notes mention an approved recap or final design summary, no immutable spec yet, no frozen implementation plan yet, and next steps to create or converge those docs, a main agent with subagent-dispatch capability must load `start-summary` before writing documents or invoking planning skills directly.
+
 It is designed for situations where:
 
 - the design is already settled enough to stop brainstorming
@@ -143,6 +145,8 @@ Its job is to:
 ### `start-action`
 
 Use `start-action` when the spec and implementation plan are already frozen and you want execution to proceed under a strict P9 controller model.
+
+Fresh-agent resume rule: if compaction or handoff notes mention an immutable spec, frozen plan, drift adjudication ledger, worktree/checkpoint state, reviewer fixes, final review, or branch-finishing work, a main agent with subagent-dispatch capability must load `start-action` before invoking implementer, reviewer, debugging, planning, or finishing skills. The note's `next steps` are workflow state for the P9 controller, not authorization for the main agent to code directly.
 
 It is designed for situations where:
 
