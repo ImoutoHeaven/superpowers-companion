@@ -11,6 +11,8 @@ Review one mutable draft spec inside `start-summary`. This skill is for `start-s
 
 Your job is to converge the draft spec from the approved recap into an unambiguous product document. The controller prompt supplies round-specific context. It does not replace this role-local skill.
 
+Use `CHANGES_REQUIRED` for draft defects that the current authoritative inputs already resolve. Use `NEEDS_DECISION` when a material product, business, or behavior decision is not actually settled by the approved recap plus authoritative inputs.
+
 ## When To Use
 
 - You were dispatched by `start-summary` as the spec reviewer.
@@ -45,6 +47,7 @@ If any authoritative input is missing, stale, or only implied from partial hando
    - internal contradiction or missing acceptance criteria
    - drift from the approved recap
    - spec text that wrongly freezes plan sequencing, file routes, literal tests, or local code detail
+   - unresolved product, business, or behavior decisions that the approved recap does not actually settle
 6. Return all blocking findings in one pass.
 
 ## Quick Reference
@@ -53,6 +56,7 @@ If any authoritative input is missing, stale, or only implied from partial hando
 - Fresh re-read each round: current spec draft
 - Fresh re-read on round 1 and after compaction or handoff: approved recap
 - Missing authoritative input: return `CHANGES_REQUIRED`
+- Unsettled material decision in approved recap: return `NEEDS_DECISION`
 - Wrong shortcut: controller prompt only
 - Wrong substitute: `review-spec-alignment`
 
@@ -60,11 +64,13 @@ If any authoritative input is missing, stale, or only implied from partial hando
 
 Return exactly:
 
-- `CHANGES_REQUIRED|PASS`
+- `CHANGES_REQUIRED|NEEDS_DECISION|PASS`
 - `SUGGEST_CHANGES`
 - `RATIONALE`
 
 Use `CHANGES_REQUIRED` if any blocking ambiguity remains, the draft conflicts with the approved recap, the spec freezes the wrong level of detail, or the authoritative inputs are incomplete for this round.
+
+Use `NEEDS_DECISION` if multiple plausible interpretations remain and choosing one would materially affect product behavior, scope, contracts, or acceptance criteria, while the approved recap plus authoritative inputs do not explicitly settle that decision.
 
 In `SUGGEST_CHANGES`, list every required edit or missing authoritative input in one pass.
 
@@ -82,6 +88,7 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 - Do not modify repo or worktree files.
 - Do not treat the controller's pasted review contract as a substitute for this skill.
 - Do not treat previous findings summaries as a substitute for current artifact review.
+- Do not convert a real unresolved business or behavior decision into ordinary draft cleanup.
 - Do not push plan sequencing, file-routing decisions, literal test content, or local helper detail into the spec.
 - Do not use `review-spec-alignment` as a shortcut. That is the wrong phase and truth model.
 - Do not silently downgrade to prompt-only review if role-local skill invocation fails in the environment. Surface the mismatch instead.
@@ -95,6 +102,8 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 | "The controller restated everything after compaction, so that pasted contract is now the live authority" | No. Treat the restated contract as current-round input, not as a replacement for the role-local skill. |
 | "`review-spec-alignment` is close enough" | No. That skill reviews implemented scopes inside `start-action`, not mutable draft specs inside `start-summary`. |
 | "If some authoritative input is missing, I should still give the best review I can" | No. Return `CHANGES_REQUIRED` and request the missing authoritative inputs explicitly. |
+| "The recap did not explicitly settle this behavior, but I can just recommend the most reasonable interpretation" | No. If that choice would materially affect product behavior or acceptance criteria, return `NEEDS_DECISION` instead of inventing product truth. |
+| "I can narrow the spec and let the controller decide later whether to ask the user" | No. If the remaining ambiguity is a real unresolved decision rather than an ordinary wording defect, say so explicitly with `NEEDS_DECISION`. |
 
 ## Red Flags
 
@@ -102,12 +111,14 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 - You are preserving a prior reviewer's near-pass posture after compaction.
 - You are treating the approved recap as optional after round 1.
 - You are asking the draft spec to freeze plan or code detail that belongs later.
+- You are about to frame a real unresolved business or behavior decision as ordinary `CHANGES_REQUIRED` instead of `NEEDS_DECISION`.
 
 ## Common Mistakes
 
 - Reviewing from the controller prompt without re-reading the approved recap.
 - Treating prior findings summaries as proof that the draft is still near `PASS`.
 - Continuing silently when the role-local skill is unavailable instead of surfacing the workflow mismatch.
+- Suggesting a concrete product behavior that the approved recap never actually settled.
 
 ## Bottom Line
 

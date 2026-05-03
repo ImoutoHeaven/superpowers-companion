@@ -11,6 +11,8 @@ Review one mutable draft implementation plan inside `start-summary`. This skill 
 
 Your job is to converge the draft plan from the frozen spec into a concrete coordination document that still respects `writing-plans` as the canonical source of plan format. The controller prompt supplies round-specific context. It does not replace this role-local skill.
 
+Use `CHANGES_REQUIRED` for draft defects that the frozen spec plus authoritative inputs already resolve. Use `NEEDS_DECISION` when the frozen spec or recap-backed inputs still leave a material product, business, or behavior decision unresolved and the plan would otherwise have to invent that truth.
+
 ## Detail Boundary And Priority
 
 Plan review in this phase removes coordination ambiguity. It does not eliminate all local implementation latitude.
@@ -45,6 +47,7 @@ You need these authoritative inputs in the current round message:
 - frozen spec absolute path
 - plan absolute path
 - must-read file absolute paths
+- recap highlights or focus points
 - current-round note about previous findings and latest changes
 
 If any authoritative input is missing, stale, or only implied from partial handoff, do not continue from memory. Return `CHANGES_REQUIRED` and use `SUGGEST_CHANGES` to request the missing authoritative inputs.
@@ -63,6 +66,7 @@ If any authoritative input is missing, stale, or only implied from partial hando
    - whether file paths are concrete when repo evidence supports them, or properly scoped to a code area when it does not
    - whether the plan overfreezes helper names, full function bodies, helper internals, or unrelated implementation detail
    - whether the draft uses valid coordination-level representations (for example comments, logic-flow bullets, API skeletons, contract tables, assertion skeletons, or verification matrices) when those forms keep behavior and verification executable without overfreezing local internals
+   - unresolved product, business, or behavior decisions that the frozen spec does not actually settle but the plan is trying to choose anyway
 7. Return all blocking findings in one pass.
 
 ## Quick Reference
@@ -70,6 +74,7 @@ If any authoritative input is missing, stale, or only implied from partial hando
 - First action: invoke `review-start-summary-plan`
 - Fresh re-read each round: frozen spec, current plan draft, canonical `writing-plans`
 - Missing authoritative input: return `CHANGES_REQUIRED`
+- Frozen spec still leaves material product decision unresolved: return `NEEDS_DECISION`
 - Wrong shortcut: controller prompt only
 - Wrong substitutes: `review-spec-alignment`, `review-code-quality`
 
@@ -77,11 +82,13 @@ If any authoritative input is missing, stale, or only implied from partial hando
 
 Return exactly:
 
-- `CHANGES_REQUIRED|PASS`
+- `CHANGES_REQUIRED|NEEDS_DECISION|PASS`
 - `SUGGEST_CHANGES`
 - `RATIONALE`
 
 Use `CHANGES_REQUIRED` if any blocking ambiguity remains, the plan conflicts with the frozen spec, the plan silently rewrites `writing-plans`, the plan freezes the wrong level of detail, the plan omits enough coordination detail to be executable, or the authoritative inputs are incomplete for this round.
+
+Use `NEEDS_DECISION` if multiple plausible interpretations remain and choosing one would materially affect product behavior, scope, contracts, acceptance criteria, or the truth the plan is assuming, while the frozen spec plus authoritative inputs do not explicitly settle that decision.
 
 Do not use `CHANGES_REQUIRED` merely because the draft preserves multiple valid local implementations via comments, logic flow, API skeletons, contract tables, assertion skeletons, or verification-focused examples.
 
@@ -102,6 +109,7 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 - Do not treat the controller's pasted review contract as a substitute for this skill.
 - Do not treat previous findings summaries as a substitute for current artifact review.
 - Do not let the plan become a second point of truth over the frozen spec.
+- Do not convert a real unresolved product or behavior decision into ordinary plan cleanup.
 - Do not remove required `writing-plans` sections just because the plan stays at contract level.
 - Do not force exact helper names, full function bodies, helper internals, or one brittle file route unless the frozen spec or repo evidence requires them.
 - Do not use `no ambiguity` as a reason to demand full function bodies, helper internals, full test bodies, or transcript-level local wiring.
@@ -124,6 +132,8 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 | "I should keep requesting more detail until no local implementation choice remains" | No. Preserve valid local implementation latitude unless the frozen spec or repo evidence forces one route. |
 | "`review-code-quality` or `review-spec-alignment` are close enough" | No. Those skills review implemented scopes inside `start-action`, not mutable draft plans inside `start-summary`. |
 | "If some authoritative input is missing, I should still give the best review I can" | No. Return `CHANGES_REQUIRED` and request the missing authoritative inputs explicitly. |
+| "The spec is frozen, so I should salvage the plan by choosing one concrete product behavior" | No. A frozen but under-settled spec does not authorize plan-level product decisions. Return `NEEDS_DECISION`. |
+| "I can just tell the controller to revise the plan wording while keeping the same hidden behavior choice" | No. If the hidden choice is a material unresolved decision, it is `NEEDS_DECISION`, not ordinary wording cleanup. |
 
 ## Red Flags
 
@@ -134,6 +144,7 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 - You are pushing the plan into a copy-paste implementation transcript.
 - You are treating implementation latitude as reviewable ambiguity.
 - You are repeating "still ambiguous" findings that would disappear only if the plan became a transcript.
+- You are about to frame a real unresolved product or behavior decision as ordinary `CHANGES_REQUIRED` instead of `NEEDS_DECISION`.
 
 ## Common Mistakes
 
@@ -141,6 +152,7 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 - Treating contract-level planning as permission to drop required `writing-plans` sections.
 - Treating comment-level or logic-flow-level planning as automatically insufficient even when behavior and verification are fully locked.
 - Continuing silently when the role-local skill is unavailable instead of surfacing the workflow mismatch.
+- Letting the plan choose a product behavior that the frozen spec never actually froze.
 
 ## Bottom Line
 

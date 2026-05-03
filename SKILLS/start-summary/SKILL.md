@@ -54,7 +54,7 @@ Do not use this skill when the discussion is settled but the recap is still ad h
 5. The plan reviewer is one fresh reviewer session reused with the same `task_id` until `PASS`.
 6. Every reviewer message must restate full context because reviewer memory can compact away.
 7. Every review round must re-read the current spec or plan file fresh.
-8. Remove all `optional` / `可选` / `可做可不做` wording about product behavior, scope, and data contracts in the spec, and about affected files, contract changes, sequencing, and verification in the plan. Replace it with a requirement, non-goal, or locked assumption.
+8. Remove all `optional` / `可选` / `可做可不做` wording about product behavior, scope, and data contracts in the spec, and about affected files, contract changes, sequencing, and verification in the plan. If the current authoritative artifacts already settle the meaning, replace it with a requirement, non-goal, or locked assumption. If they do not, return `NEEDS_DECISION` instead of inventing a local resolution.
 9. Once the spec passes, it becomes immutable. Re-read the frozen spec yourself fresh before writing or fixing the plan.
 10. The frozen spec is the product and behavior truth. The referenced repo or codebase is the executability truth. The plan is a derived coordination artifact and must never become a second point of truth.
 11. If the plan conflicts with the frozen spec, the plan is wrong and must be revised. Do not reinterpret the spec to save the plan.
@@ -100,7 +100,7 @@ Always report the absolute resolved paths, not just the repo-relative paths.
 6. Spawn one fresh spec reviewer subagent and explicitly instruct it to invoke `review-start-summary-spec` before acting.
 7. Keep using the same spec reviewer `task_id` until it returns `PASS`.
    - If the spec reviewer returns empty output, send exactly `continue` to that same spec reviewer `task_id`. Do not add context, switch sessions, self-review, write the plan, freeze the spec, report progress, or treat the review as advanced.
-   - If the spec reviewer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective spec-reviewer prompt to that same spec reviewer `task_id`. The prompt must include the full spec reviewer prompt contract, `review-start-summary-spec` invocation, authoritative paths, current draft status, previous findings and latest changes, and the exact `CHANGES_REQUIRED|PASS`, `SUGGEST_CHANGES`, `RATIONALE` response contract.
+   - If the spec reviewer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective spec-reviewer prompt to that same spec reviewer `task_id`. The prompt must include the full spec reviewer prompt contract, `review-start-summary-spec` invocation, authoritative paths, current draft status, previous findings and latest changes, and the exact `CHANGES_REQUIRED|NEEDS_DECISION|PASS`, `SUGGEST_CHANGES`, `RATIONALE` response contract.
 8. Freeze the spec only after `PASS`. Until then it remains an editable draft.
 9. Re-read the frozen spec yourself fresh. Do not rely on memory from the drafting or review loop.
 10. Only now derive the plan from the immutable spec. Any `TASK_GROUP`, `TASK`, `STEP`, or tentative task outline counts as plan drafting.
@@ -109,7 +109,7 @@ Always report the absolute resolved paths, not just the repo-relative paths.
 13. Spawn one fresh plan reviewer subagent and explicitly instruct it to invoke `review-start-summary-plan` before acting.
 14. Keep using the same plan reviewer `task_id` until it returns `PASS`.
     - If the plan reviewer returns empty output, send exactly `continue` to that same plan reviewer `task_id`. Do not add context, switch sessions, self-review, freeze the plan, finalize, report progress, or treat the review as advanced.
-    - If the plan reviewer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective plan-reviewer prompt to that same plan reviewer `task_id`. The prompt must include the full plan reviewer prompt contract, `review-start-summary-plan` invocation, authoritative paths, current draft status, previous findings and latest changes, and the exact `CHANGES_REQUIRED|PASS`, `SUGGEST_CHANGES`, `RATIONALE` response contract.
+    - If the plan reviewer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective plan-reviewer prompt to that same plan reviewer `task_id`. The prompt must include the full plan reviewer prompt contract, `review-start-summary-plan` invocation, authoritative paths, current draft status, previous findings and latest changes, and the exact `CHANGES_REQUIRED|NEEDS_DECISION|PASS`, `SUGGEST_CHANGES`, `RATIONALE` response contract.
 15. Freeze the plan only after `PASS`.
 16. Report both absolute paths.
 
@@ -178,11 +178,12 @@ Every message to the spec reviewer must fully include:
   2. Re-read the spec file fresh on every round. Re-read the approved recap artifact fresh on round 1, and again after compaction, partial handoff, or whenever you suspect recap-to-spec drift. Other files do not need a fresh re-read every round.
   3. Treat the spec as a mutable draft until you return `PASS`. Do not assume it is already frozen.
   4. If any authoritative input is missing after compaction or broken handoff, return `CHANGES_REQUIRED` and use `SUGGEST_CHANGES` to request the missing authoritative inputs instead of guessing from prior notes.
-  5. Find every ambiguous statement, especially `optional`, `可选`, `可做可不做`, and any wording that leaves product behavior, scope, or data contracts open to interpretation.
-  6. Focus on implementability, correctness, macro-level soundness, internal consistency, and absence of ambiguity. Do not nitpick style.
-  7. Do not force plan-level sequencing, file-routing decisions, literal test content, or local code-level choices into the spec. Keep the spec focused on product behavior, scope, data contracts, and acceptance criteria.
-  8. Return all findings in one pass. Do not drip-feed one finding at a time.
-  9. Return exactly `CHANGES_REQUIRED|PASS`, `SUGGEST_CHANGES`, and `RATIONALE`.
+  5. If a material product, business, or behavior decision is not explicitly settled by the approved recap plus authoritative inputs, return `NEEDS_DECISION` instead of guessing, narrowing scope on your own, or converting the gap into an ordinary draft edit.
+  6. Find every ambiguous statement, especially `optional`, `可选`, `可做可不做`, and any wording that leaves product behavior, scope, or data contracts open to interpretation.
+  7. Focus on implementability, correctness, macro-level soundness, internal consistency, and absence of ambiguity. Do not nitpick style.
+  8. Do not force plan-level sequencing, file-routing decisions, literal test content, or local code-level choices into the spec. Keep the spec focused on product behavior, scope, data contracts, and acceptance criteria.
+  9. Return all findings in one pass. Do not drip-feed one finding at a time.
+  10. Return exactly `CHANGES_REQUIRED|NEEDS_DECISION|PASS`, `SUGGEST_CHANGES`, and `RATIONALE`.
 
 Recommended prompt skeleton:
 
@@ -204,12 +205,13 @@ Review requirements:
 2. Re-read the spec file fresh on every round. Re-read the approved recap artifact fresh on round 1, and again after compaction, partial handoff, or whenever you suspect recap-to-spec drift. Other files do not need a fresh re-read every round.
 3. Treat the spec as a mutable draft until you return PASS. Do not assume it is already frozen.
 4. If any authoritative input is missing after compaction or broken handoff, return CHANGES_REQUIRED and use SUGGEST_CHANGES to request the missing authoritative inputs instead of guessing from prior notes.
-5. Find every ambiguous statement, especially optional wording that leaves product behavior, scope, or data contracts open to interpretation.
-6. Focus on implementability, correctness, macro-level soundness, internal consistency, and absence of ambiguity. Do not nitpick style.
-7. Do not force plan-level sequencing, file-routing decisions, literal test content, or local code-level choices into the spec. Keep the spec focused on product behavior, scope, data contracts, and acceptance criteria.
-8. Return all findings in one pass.
-9. Return exactly:
-   - CHANGES_REQUIRED|PASS
+5. If a material product, business, or behavior decision is not explicitly settled by the approved recap plus authoritative inputs, return NEEDS_DECISION instead of guessing, narrowing scope on your own, or converting the gap into an ordinary draft edit.
+6. Find every ambiguous statement, especially optional wording that leaves product behavior, scope, or data contracts open to interpretation.
+7. Focus on implementability, correctness, macro-level soundness, internal consistency, and absence of ambiguity. Do not nitpick style.
+8. Do not force plan-level sequencing, file-routing decisions, literal test content, or local code-level choices into the spec. Keep the spec focused on product behavior, scope, data contracts, and acceptance criteria.
+9. Return all findings in one pass.
+10. Return exactly:
+   - CHANGES_REQUIRED|NEEDS_DECISION|PASS
    - SUGGEST_CHANGES
    - RATIONALE
 ```
@@ -234,18 +236,19 @@ Every message to the plan reviewer must fully include:
   2. Re-read the spec, the plan, and the canonical `writing-plans` skill fresh on every round.
   3. Treat the spec as immutable baseline. Treat the plan as a mutable draft until you return `PASS`.
   4. If any authoritative input is missing after compaction or broken handoff, return `CHANGES_REQUIRED` and use `SUGGEST_CHANGES` to request the missing authoritative inputs instead of guessing from prior notes.
-  5. Find every ambiguous statement, especially `optional`, `可选`, `可做可不做`, and any wording that leaves the intended implementation surface, contract changes, sequencing, or verification open to interpretation.
-  6. Focus on reasonable task architecture, strict alignment with the spec, practical executability, and preventing the plan from becoming a second point of truth. Do not nitpick style.
-  7. Treat `writing-plans` as the canonical source of truth for required plan format and section types. If the plan omits required `writing-plans` sections or silently rewrites that scaffold, return `CHANGES_REQUIRED`.
-  8. Require concrete file paths when must-read repo evidence already supports them. If the repo still leaves multiple plausible placements, require the plan to name the relevant code area or boundary instead of freezing one brittle exact route.
-  9. Judge code, function, and test sections by whether they lock API and contract behavior, inputs and outputs, required assertions, and verification intent. Judge command sections against `writing-plans` exact-command expectation; do not relax command exactness here.
-  10. Treat comments, logic-flow bullets, API skeletons, contract tables, assertion skeletons, and verification matrices as valid plan representations when they lock behavior, interfaces, sequencing, assertions, and verification intent.
-  11. If the plan includes gratuitous full function definitions, full test definitions, helper internals, or unrelated implementation detail that the frozen spec and must-read repo evidence do not require, return `CHANGES_REQUIRED`.
-  12. Do not require the plan to freeze exact helper names, function bodies, helper internals, one exact file route, or transcript-level local wiring unless the frozen spec or must-read repo evidence makes that detail necessary for executability.
-  13. The ban on full detailed copy-paste transcript plans has priority over any broad reading of `no ambiguity`. Remove coordination ambiguity, but preserve valid local implementation latitude.
-  14. If a plan step depends on repo assumptions that are not supported by the must-read files, or would require spec drift if implemented literally, return `CHANGES_REQUIRED`; do not reinterpret the spec to save the plan. At `start-summary` stage this is a blocking draft defect that must be fixed before `PASS`; if the same defect survives into a frozen plan later, it becomes plan drift evidence for downstream adjudication.
-  15. Return all findings in one pass. Do not drip-feed one finding at a time.
-  16. Return exactly `CHANGES_REQUIRED|PASS`, `SUGGEST_CHANGES`, and `RATIONALE`.
+  5. If the frozen spec or recap-backed inputs still leave a material product, business, or behavior decision unresolved, return `NEEDS_DECISION` instead of inventing plan detail, narrowing behavior on your own, or framing the issue as ordinary plan polish.
+  6. Find every ambiguous statement, especially `optional`, `可选`, `可做可不做`, and any wording that leaves the intended implementation surface, contract changes, sequencing, or verification open to interpretation.
+  7. Focus on reasonable task architecture, strict alignment with the spec, practical executability, and preventing the plan from becoming a second point of truth. Do not nitpick style.
+  8. Treat `writing-plans` as the canonical source of truth for required plan format and section types. If the plan omits required `writing-plans` sections or silently rewrites that scaffold, return `CHANGES_REQUIRED`.
+  9. Require concrete file paths when must-read repo evidence already supports them. If the repo still leaves multiple plausible placements, require the plan to name the relevant code area or boundary instead of freezing one brittle exact route.
+  10. Judge code, function, and test sections by whether they lock API and contract behavior, inputs and outputs, required assertions, and verification intent. Judge command sections against `writing-plans` exact-command expectation; do not relax command exactness here.
+  11. Treat comments, logic-flow bullets, API skeletons, contract tables, assertion skeletons, and verification matrices as valid plan representations when they lock behavior, interfaces, sequencing, assertions, and verification intent.
+  12. If the plan includes gratuitous full function definitions, full test definitions, helper internals, or unrelated implementation detail that the frozen spec and must-read repo evidence do not require, return `CHANGES_REQUIRED`.
+  13. Do not require the plan to freeze exact helper names, function bodies, helper internals, one exact file route, or transcript-level local wiring unless the frozen spec or must-read repo evidence makes that detail necessary for executability.
+  14. The ban on full detailed copy-paste transcript plans has priority over any broad reading of `no ambiguity`. Remove coordination ambiguity, but preserve valid local implementation latitude.
+  15. If a plan step depends on repo assumptions that are not supported by the must-read files, or would require spec drift if implemented literally, return `CHANGES_REQUIRED`; do not reinterpret the spec to save the plan. At `start-summary` stage this is a blocking draft defect that must be fixed before `PASS`; if the same defect survives into a frozen plan later, it becomes plan drift evidence for downstream adjudication.
+  16. Return all findings in one pass. Do not drip-feed one finding at a time.
+  17. Return exactly `CHANGES_REQUIRED|NEEDS_DECISION|PASS`, `SUGGEST_CHANGES`, and `RATIONALE`.
 
 Recommended prompt skeleton:
 
@@ -269,19 +272,20 @@ Review requirements:
 2. Re-read the spec, the plan, and the canonical writing-plans skill fresh on every round.
 3. Treat the spec as immutable baseline. Treat the plan as a mutable draft until you return PASS.
 4. If any authoritative input is missing after compaction or broken handoff, return CHANGES_REQUIRED and use SUGGEST_CHANGES to request the missing authoritative inputs instead of guessing from prior notes.
-5. Find every ambiguous statement, especially optional wording that leaves the intended implementation surface, contract changes, sequencing, or verification open to interpretation.
-6. Focus on reasonable task architecture, strict alignment with the spec, practical executability, and preventing the plan from becoming a second point of truth. Do not nitpick style.
-7. Treat writing-plans as the canonical source of truth for required plan format and section types. If the plan omits required writing-plans sections or silently rewrites that scaffold, return CHANGES_REQUIRED.
-8. Require concrete file paths when must-read repo evidence already supports them. If the repo still leaves multiple plausible placements, require the plan to name the relevant code area or boundary instead of freezing one brittle exact route.
-9. Judge code, function, and test sections by whether they lock API and contract behavior, inputs and outputs, required assertions, and verification intent. Judge command sections against writing-plans exact-command expectation; do not relax command exactness here.
-10. Treat comments, logic-flow bullets, API skeletons, contract tables, assertion skeletons, and verification matrices as valid plan representations when they lock behavior, interfaces, sequencing, assertions, and verification intent.
-11. If the plan includes gratuitous full function definitions, full test definitions, helper internals, or unrelated implementation detail that the frozen spec and must-read repo evidence do not require, return CHANGES_REQUIRED.
-12. Do not require the plan to freeze exact helper names, function bodies, helper internals, one exact file route, or transcript-level local wiring unless the frozen spec or must-read repo evidence makes that detail necessary for executability.
-13. The ban on full detailed copy-paste transcript plans has priority over any broad reading of no ambiguity. Remove coordination ambiguity, but preserve valid local implementation latitude.
-14. If a plan step depends on repo assumptions that are not supported by the must-read files, or would require spec drift if implemented literally, return CHANGES_REQUIRED; do not reinterpret the spec to save the plan. At start-summary stage this is a blocking draft defect that must be fixed before PASS; if the same defect survives into a frozen plan later, it becomes plan drift evidence for downstream adjudication.
-15. Return all findings in one pass.
-16. Return exactly:
-   - CHANGES_REQUIRED|PASS
+5. If the frozen spec or recap-backed inputs still leave a material product, business, or behavior decision unresolved, return NEEDS_DECISION instead of inventing plan detail, narrowing behavior on your own, or framing the issue as ordinary plan polish.
+6. Find every ambiguous statement, especially optional wording that leaves the intended implementation surface, contract changes, sequencing, or verification open to interpretation.
+7. Focus on reasonable task architecture, strict alignment with the spec, practical executability, and preventing the plan from becoming a second point of truth. Do not nitpick style.
+8. Treat writing-plans as the canonical source of truth for required plan format and section types. If the plan omits required writing-plans sections or silently rewrites that scaffold, return CHANGES_REQUIRED.
+9. Require concrete file paths when must-read repo evidence already supports them. If the repo still leaves multiple plausible placements, require the plan to name the relevant code area or boundary instead of freezing one brittle exact route.
+10. Judge code, function, and test sections by whether they lock API and contract behavior, inputs and outputs, required assertions, and verification intent. Judge command sections against writing-plans exact-command expectation; do not relax command exactness here.
+11. Treat comments, logic-flow bullets, API skeletons, contract tables, assertion skeletons, and verification matrices as valid plan representations when they lock behavior, interfaces, sequencing, assertions, and verification intent.
+12. If the plan includes gratuitous full function definitions, full test definitions, helper internals, or unrelated implementation detail that the frozen spec and must-read repo evidence do not require, return CHANGES_REQUIRED.
+13. Do not require the plan to freeze exact helper names, function bodies, helper internals, one exact file route, or transcript-level local wiring unless the frozen spec or must-read repo evidence makes that detail necessary for executability.
+14. The ban on full detailed copy-paste transcript plans has priority over any broad reading of no ambiguity. Remove coordination ambiguity, but preserve valid local implementation latitude.
+15. If a plan step depends on repo assumptions that are not supported by the must-read files, or would require spec drift if implemented literally, return CHANGES_REQUIRED; do not reinterpret the spec to save the plan. At start-summary stage this is a blocking draft defect that must be fixed before PASS; if the same defect survives into a frozen plan later, it becomes plan drift evidence for downstream adjudication.
+16. Return all findings in one pass.
+17. Return exactly:
+   - CHANGES_REQUIRED|NEEDS_DECISION|PASS
    - SUGGEST_CHANGES
    - RATIONALE
 ```
@@ -290,6 +294,7 @@ Review requirements:
 
 - If the reviewer returns stale findings, explicitly tell it to re-read the current file fresh and ignore superseded points.
 - If the reviewer returns `CHANGES_REQUIRED` because authoritative inputs were missing after compaction or broken handoff, resend the missing authoritative inputs to that same reviewer session and continue the same document loop.
+- If the reviewer returns `NEEDS_DECISION`, stop the current document loop, ask the user one focused clarification question, refresh the recap with the new authoritative answer, and restart `start-summary` from that updated recap instead of patching only the current draft.
 - If the reviewer returns empty output, prompt only `continue` verbatim to that same `task_id` for that empty turn, then reclassify the next response fresh.
 - If the reviewer returns non-empty but invalid, malformed, or nonconforming output, resend the full reviewer prompt contract to that same `task_id` for that invalid turn, then reclassify the next response fresh.
 - Do not discard the reviewer and open a new session. Keep the same reviewer `task_id` for that document until convergence.
@@ -320,11 +325,12 @@ Before each review round, scan for wording like this in statements about product
 - `可以`
 - `可做可不做`
 
-For each hit, choose one of three outcomes:
+For each hit, choose one of four outcomes:
 
 1. Turn it into a hard requirement.
 2. Turn it into a hard non-goal.
 3. Turn it into a locked assumption.
+4. If the wording exposes a real business or behavior decision that the authoritative artifacts do not settle, return `NEEDS_DECISION` and reopen the user decision instead of inventing a local answer.
 
 Do not carry the ambiguous wording into the final docs.
 
@@ -341,6 +347,8 @@ Do not carry the ambiguous wording into the final docs.
 | "The controller prompt already encodes the review procedure, so a reviewer skill is redundant" | No. The prompt carries current-round context. The reviewer must still invoke its role-local skill so the discipline survives compaction, partial handoff, and controller prompt drift. |
 | "Because the controller restated everything after compaction, I can treat that pasted contract as the reviewer's live authority" | No. Restated context does not replace the role-local reviewer skill or the required fresh artifact review. |
 | "There is no missing-context status token here, so the reviewer should guess from prior notes" | No. Return `CHANGES_REQUIRED` and use `SUGGEST_CHANGES` to request the missing authoritative inputs. |
+| "The recap never settled this behavior, but I can fix the draft by picking the most reasonable interpretation" | No. That is `NEEDS_DECISION`, not ordinary draft repair. Ask the user one focused clarification and reconverge the recap/spec chain. |
+| "The spec is frozen, so I should salvage the plan by choosing one concrete behavior path" | No. A frozen but under-settled spec is not permission for plan-level product decisions. Return `NEEDS_DECISION` and reopen upstream truth. |
 | "If the role-local reviewer skill is unavailable in the environment, the reviewer should silently fall back to prompt-only review" | No. Surface the workflow mismatch explicitly instead of silently downgrading the review model. |
 | "Optional wording is fine because the implementer is smart" | Smart implementers still diverge when behavior, scope, contracts, sequencing, or verification stay ambiguous. Remove that ambiguity. |
 | "No optional wording means I should freeze exact helper names, code bodies, full test definitions, or one file route" | No. Remove coordination ambiguity without turning the plan into a code transcript. Preserve repo-local implementation latitude unless the frozen spec or repo evidence requires a specific route. |
@@ -379,6 +387,8 @@ Do not carry the ambiguous wording into the final docs.
 - Inheriting a prior reviewer's "close to PASS" posture after compaction or partial handoff instead of re-establishing the evidence chain.
 - Letting a reviewer silently degrade to prompt-only review because role-local skill invocation failed.
 - Treating valid implementation latitude as unresolved review ambiguity.
+- Treating a real unresolved business or behavior decision as ordinary `CHANGES_REQUIRED` instead of `NEEDS_DECISION`.
+- Continuing to edit only the spec or only the plan after a reviewer has returned `NEEDS_DECISION`.
 - Editing the spec after declaring it immutable.
 - Returning relative paths only.
 - Leaving `optional` or similar wording in either final document.
