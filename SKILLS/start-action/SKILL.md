@@ -1,6 +1,6 @@
 ---
 name: start-action
-description: Use when a main agent with subagent-dispatch capability sees compaction or handoff notes for implementation using an immutable spec, frozen plan, drift adjudication ledger, worktree, reviewer fixes, checkpoint commits, or final review.
+description: Use when a main agent with subagent-dispatch capability sees compaction or handoff notes for implementation using an immutable spec, frozen plan, drift adjudication ledger, worktree, reviewer fixes, checkpoint commits, final review, empty subagent output, or invalid verdicts.
 ---
 
 # Start Action
@@ -87,6 +87,8 @@ Subagents must also be told that if they are compacted and lose loaded-skill mem
 20. If the investigation cannot establish a safe executable path or binding execution overlay from current authoritative evidence, stop the workflow and raise an `ADJUDICATION_INSUFFICIENT_EVIDENCE` exception report.
 21. Do not silently reinterpret the plan and do not keep iterating the same unsatisfiable review loop.
 22. Every start-action subagent must invoke its role-local skill before acting, and must re-invoke that same role-local skill after compaction if loaded-skill memory is lost.
+23. Empty subagent output is not a result, verdict, blocker, drift evidence, or progress. It means the role session may have been interrupted before responding. For that empty turn, send exactly `continue` to that same `task_id` and do nothing else for that role. Classify the next response fresh: empty output gets another exact `continue`; non-empty invalid output gets full context repair; valid output follows its normal branch.
+24. Non-empty but invalid, malformed, or nonconforming role output is also not progress, but it is a context-repair problem rather than an interruption. Send a full corrective context prompt to the same `task_id` using the normal subagent prompt contract for that role. Do not switch sessions, self-implement, self-review, dispatch a dependent role, checkpoint, or report progress.
 
 ## Workflow Skeleton
 
@@ -115,25 +117,29 @@ If the baseline is red and the CTO gave no special instruction, stop the workflo
 For each task or task-group, follow this loop:
 
 1. Spawn one fresh implementer.
-2. Spawn one fresh spec reviewer.
-3. Spawn one fresh code reviewer.
-4. Implementer returns one of `DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT`, `BLOCKED`, or `PLAN_DRIFT_EVIDENCE`.
-5. If the implementer returns `NEEDS_CONTEXT`, provide the missing context and continue the same scope with the same implementer session.
-6. If the implementer returns `BLOCKED`, decide whether the blocker is resolvable without changing the immutable spec or adjudicating plan drift. If yes, provide the needed direction and continue the same scope. If no, stop the current scope and raise an exception report.
-7. If the implementer returns `PLAN_DRIFT_EVIDENCE`, pause the affected scope and run a P9-controlled adjudication loop before deciding whether execution can continue.
-8. If the implementer returns `DONE` or `DONE_WITH_CONCERNS`, send the exact completion claims and any concerns to both reviewers.
-9. Spec reviewer checks immutable spec alignment first, then whether the frozen plan still functions as a valid derived guide for that same scope.
-10. Code reviewer checks correctness, regressions, quality, and whether actual repo or worktree evidence proves the frozen plan step stale or unexecutable for that same scope.
-11. If either reviewer returns `NEEDS_CONTEXT`, resend the missing authoritative inputs to that same reviewer session and repeat the same review round.
-12. If either reviewer produces plan drift evidence, pause the affected scope and run a P9-controlled adjudication loop before deciding whether execution can continue.
-13. In the adjudication loop, spawn fresh read-only investigation subagents to compare the immutable spec, the frozen plan, the drift adjudication ledger, and actual repo or worktree evidence. They may read files and run read-only verification commands, but may not modify files.
-14. If the adjudication concludes `EXECUTABLE_AS_WRITTEN` or `PLAN_DRIFT_CONTINUE_SAFE`, append a ledger entry and update the active summary before resuming. Continue the scope under the effective execution contract recorded there.
-15. If the adjudication concludes `SPEC_RECONVERGENCE_REQUIRED`, append the ledger entry, stop the current scope, and raise a `SPEC_RECONVERGENCE_REQUIRED` exception report.
-16. If the adjudication concludes `INSUFFICIENT_EVIDENCE`, append the ledger entry, stop the current scope, and raise an `ADJUDICATION_INSUFFICIENT_EVIDENCE` exception report.
-17. If either reviewer returns blocking findings that do not require adjudication or invalidation, send all findings back to the same implementer.
-18. Repeat until both reviewers converge.
-19. Only then require the implementer to create the checkpoint commit.
-20. After the checkpoint commit succeeds, advance to the next scope.
+2. Do not prompt, run, or otherwise advance reviewers until the implementer returns valid `DONE` or `DONE_WITH_CONCERNS` for the current scope.
+3. Implementer returns one of `DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT`, `BLOCKED`, or `PLAN_DRIFT_EVIDENCE`.
+   - If the implementer returns empty output, send exactly `continue` to that same implementer `task_id`. Do not add context, switch sessions, implement yourself, dispatch reviewers, report progress, or treat the scope as advanced.
+   - If the implementer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective implementer prompt to that same implementer `task_id`. The prompt must include the full subagent and implementer prompt contracts, role-local skill invocation, authoritative paths, current progress state, assigned scope, valid status list, and second-round `pua` plus `systematic-debugging` instruction when applicable.
+4. If the implementer returns `NEEDS_CONTEXT`, provide the missing context and continue the same scope with the same implementer session.
+5. If the implementer returns `BLOCKED`, decide whether the blocker is resolvable without changing the immutable spec or adjudicating plan drift. If yes, provide the needed direction and continue the same scope. If no, stop the current scope and raise an exception report.
+6. If the implementer returns `PLAN_DRIFT_EVIDENCE`, pause the affected scope and run a P9-controlled adjudication loop before deciding whether execution can continue.
+7. If the implementer returns `DONE` or `DONE_WITH_CONCERNS`, spawn or prompt one fresh spec reviewer and one fresh code reviewer, then send the exact completion claims and any concerns to both reviewers.
+8. Spec reviewer checks immutable spec alignment first, then whether the frozen plan still functions as a valid derived guide for that same scope.
+9. Code reviewer checks correctness, regressions, quality, and whether actual repo or worktree evidence proves the frozen plan step stale or unexecutable for that same scope.
+10. Classify each reviewer response before advancing:
+    - If either reviewer returns empty output, send exactly `continue` to that same reviewer `task_id`. Do not add context, switch sessions, self-review, run the next dependent role, checkpoint, report progress, or treat the review as advanced.
+    - If either reviewer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective reviewer prompt to that same reviewer `task_id`. The prompt must include the full subagent and reviewer prompt contracts, role-local skill invocation, authoritative paths, current progress state, assigned scope, implementation claims or review inputs, valid verdict list, and second-round `pua` plus `systematic-debugging` instruction when applicable.
+    - If either reviewer returns `NEEDS_CONTEXT`, resend the missing authoritative inputs to that same reviewer session and repeat the same review round.
+11. If either reviewer produces plan drift evidence, pause the affected scope and run a P9-controlled adjudication loop before deciding whether execution can continue.
+12. In the adjudication loop, spawn fresh read-only investigation subagents to compare the immutable spec, the frozen plan, the drift adjudication ledger, and actual repo or worktree evidence. They may read files and run read-only verification commands, but may not modify files.
+13. If the adjudication concludes `EXECUTABLE_AS_WRITTEN` or `PLAN_DRIFT_CONTINUE_SAFE`, append a ledger entry and update the active summary before resuming. Continue the scope under the effective execution contract recorded there.
+14. If the adjudication concludes `SPEC_RECONVERGENCE_REQUIRED`, append the ledger entry, stop the current scope, and raise a `SPEC_RECONVERGENCE_REQUIRED` exception report.
+15. If the adjudication concludes `INSUFFICIENT_EVIDENCE`, append the ledger entry, stop the current scope, and raise an `ADJUDICATION_INSUFFICIENT_EVIDENCE` exception report.
+16. If either reviewer returns blocking findings that do not require adjudication or invalidation, send all findings back to the same implementer.
+17. Repeat until both reviewers converge.
+18. Only then require the implementer to create the checkpoint commit.
+19. After the checkpoint commit succeeds, advance to the next scope.
 
 Do not return to the user after one checkpoint. Continue until all scopes are complete.
 
@@ -142,6 +148,8 @@ Do not return to the user after one checkpoint. Continue until all scopes are co
 - Across separate tasks or task-groups, spawn new subagents.
 - Do not reuse the implementer or reviewers from the previous task.
 - Inside a single task loop, keep talking to the same three role sessions.
+- Empty output never creates a cross-task reset. It is zero progress inside the current task loop; keep the same role session and prompt only `continue` for that empty turn, then reclassify the next response fresh.
+- Invalid, malformed, or nonconforming non-empty output also never creates a cross-task reset. It is zero progress that requires a full corrective context prompt to the same role session, not a new session.
 
 ### 3. Final Whole-Branch Loop
 
@@ -341,6 +349,8 @@ If a subtask is frontend-related, explicitly instruct the subagent to load relev
 - Within the main task loop, spec reviewer and code reviewer may run in parallel for the same granularity once the implementer has finished the current scope.
 - No checkpoint commit before both are converged.
 - During final and regression stages, the paired spec and code reviewers also run in parallel.
+- A reviewer that returns empty output has not run for workflow purposes. Do not start a dependent next role, checkpoint, or convergence decision from that non-result; send exactly `continue` to that same reviewer session.
+- A reviewer that returns a non-empty invalid, malformed, or nonconforming verdict has not run for workflow purposes. Do not start a dependent next role, checkpoint, or convergence decision from that non-result; send a full corrective reviewer prompt to that same reviewer session.
 
 ## Exception State
 
@@ -387,6 +397,11 @@ When this happens, raise an exception report with:
 | "The handoff says next steps are to fix reviewer findings, so I should start with debugging or implementation skills" | No. A main agent with dispatch capability must reload `start-action` first; the next steps are P9 workflow state for subagents. |
 | "This is almost done, so I should invoke finishing-a-development-branch" | No. Final review findings, unresolved fixes, or missing regression convergence mean the `start-action` workflow is still active. |
 | "I see spec, plan, ledger, and worktree paths, so I can continue from the notes without reloading the workflow" | No. Those are the compaction signals that require `start-action`. |
+| "The subagent returned empty five times, so the session is dead and I should replace it" | No. Empty output is zero progress, not permission to swap sessions. Prompt the same `task_id` with exactly `continue` for each empty turn, then reclassify the next response fresh. |
+| "The subagent returned malformed output, so I should replace it" | No. Malformed non-empty output is usually context loss or unloaded role skill. Send a full corrective context prompt to the same `task_id`. |
+| "A bare `continue` did not work after empty responses, so I should send a fuller corrective prompt" | No. For truly empty output, use exactly `continue` verbatim so you do not drown the interrupted session's context window. |
+| "The response is invalid, so I should send only `continue`" | No. A non-empty invalid response shows the subagent responded without following the role contract. Repair context with the full detailed prompt to the same `task_id`. |
+| "The reviewer is empty, so I can inspect the code myself or ask the next reviewer anyway" | No. A missing verdict blocks the workflow. Same reviewer `task_id`, exactly `continue`, no self-review and no dependent role advancement. |
 
 ## Red Flags
 
@@ -404,6 +419,11 @@ When this happens, raise an exception report with:
 - Resuming from compaction or handoff notes with immutable spec, frozen plan, and drift ledger signals but invoking `subagent-driven-development`, `execute-implementation-scope`, `systematic-debugging`, or `finishing-a-development-branch` before `start-action`.
 - Jumping straight to a terminal adjudication state without running the adjudication loop.
 - Keeping an unsatisfiable review loop running after adjudication already established that a frozen plan step is wrong.
+- Treating empty subagent output, missing status, malformed status, or invalid verdict as progress.
+- Replacing a same-scope implementer, reviewer, final reviewer, regression reviewer, investigator, or fix implementer before the previous same-role session returns a valid workflow result.
+- Sending anything other than exactly `continue` to a same-role subagent after truly empty output.
+- Sending only `continue` after a non-empty invalid, malformed, or nonconforming role response instead of repairing context with the full same-role prompt contract.
+- Implementing, reviewing, fixing, checkpointing, or reporting because the active subagent has not produced a valid result.
 
 ## Completion
 
