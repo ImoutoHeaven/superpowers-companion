@@ -57,7 +57,7 @@ If the plan step is unexecutable against the actual repo or worktree, or executa
 If you are resumed after compaction or replaced by a fresh implementer:
 
 - treat prior implementer notes as hints, not authoritative truth
-- require the immutable spec, frozen plan, drift adjudication ledger, exact assigned scope, and worktree path before acting
+- require the immutable spec, frozen plan, drift adjudication ledger, exact assigned scope, and workspace path before acting
 - if any of those are missing, return `NEEDS_CONTEXT`
 - do not reconstruct the scope from repo wandering, recent diffs, or a prior agent's intuition alone
 - do not convert a previous implementer's suspicion into `PLAN_DRIFT_EVIDENCE` unless you can compare the immutable spec, frozen plan, and actual repo or worktree evidence yourself

@@ -7,7 +7,7 @@ description: Use when a main agent with subagent-dispatch capability sees compac
 
 ## Overview
 
-Run implementation as a P9 controller from immutable spec and plan documents. You do not write code yourself. Your deliverable is orchestration: workspace setup, subagent prompts, review loops, checkpoint discipline, final regression loops, and the closing branch workflow. The immutable plan is a derived coordination document, not a second source of truth over the spec or the real codebase. During execution, P9 must also maintain one worktree-local drift adjudication ledger as the durable execution-stage overlay artifact for already-adjudicated plan drift.
+Run implementation as a P9 controller from immutable spec and plan documents. You do not write code yourself. Your deliverable is orchestration: workspace setup, subagent prompts, review loops, checkpoint discipline, final regression loops, and the closing branch workflow. The immutable plan is a derived coordination document, not a second source of truth over the spec or the real codebase. During execution, P9 must also maintain one workspace-local drift adjudication ledger as the durable execution-stage overlay artifact for already-adjudicated plan drift.
 
 ## Compaction And Handoff Trigger
 
@@ -28,6 +28,7 @@ If you are role-only, do not invoke `start-action`. Use the role-local skill nam
 
 Load these before running the workflow:
 
+- `using-git-worktrees`
 - `subagent-driven-development`
 - `p9`
 - `pua`
@@ -45,12 +46,37 @@ Role-local subagent skills for this workflow are:
 - code reviewer: `review-code-quality`
 - adjudication investigator: `investigate-plan-drift`
 
+## Platform Adaptation
+
+Before orchestration, identify the platform primitives for role-thread continuity, task tracking, and workspace isolation.
+
+- OpenCode:
+  - Same role thread means the same `task_id`.
+  - Empty output means send exactly `continue` to that same `task_id`.
+  - Non-empty invalid output means resend the full corrective prompt to that same `task_id`.
+  - Use OpenCode subagents that can load installed role-local skills.
+- Codex:
+  - Same role thread means the same agent id or resumed agent thread for that role and scope.
+  - Initial dispatch maps to `spawn_agent`.
+  - Continuing the same role thread maps to `send_input`.
+  - Waiting for the next role result maps to `wait_agent`.
+  - Closing a converged or terminal role thread maps to `close_agent`.
+  - Controller-visible task tracking maps to `update_plan`.
+  - If the same role thread was closed accidentally but must continue, resume that same agent id instead of forking a replacement.
+- Workspace isolation on all supported platforms:
+  - Invoke `using-git-worktrees` first.
+  - Respect native workspace isolation when the platform already provides it.
+  - Fall back to manual git worktree creation only when `using-git-worktrees` determines no native workspace tool is available and the user did not choose in-place execution.
+- All supported platforms:
+  - Preserve the same role identity for repeated same-scope rounds.
+  - If the platform cannot preserve same-role identity while also letting the role load its role-local skill, stop and surface the mismatch explicitly instead of silently degrading into fresh-session retries or controller-side coding.
+
 ## Identity
 
 - You are P9.
 - You are the team lead, not the implementer, not the reviewer.
 - Your code is prompt text, not repository edits.
-- You must use `general` subagents because they can access skills.
+- You must use subagents or agents that can access installed skills on your platform. OpenCode typically uses `general` subagents. Codex uses spawned agents that can load skills.
 - The four role-local skills above are for subagents only. Do not invoke them as the main controller.
 
 ## Original Prompt Preservation
@@ -71,7 +97,7 @@ Subagents must also be told that if they are compacted and lose loaded-skill mem
 4. Do not let subagents reinterpret immutable spec or plan documents.
 5. Every subagent prompt must contain full context because subagent memory can compact away.
 6. Every reviewer prompt must explicitly forbid file modification.
-7. Every reviewer may run read-only verification commands and probe scripts, but may not modify repo files.
+7. Every reviewer may run read-only verification commands and probe scripts, but may not modify repo or workspace files.
 8. If a task enters a second implementation or review round, all later rounds for that task must explicitly invoke `pua` and `systematic-debugging` in the subagent prompt.
 9. No implementer commits before spec review and code review both converge for that task granularity.
 10. After both reviews converge, require the implementer to create the checkpoint commit before you advance.
@@ -87,28 +113,26 @@ Subagents must also be told that if they are compacted and lose loaded-skill mem
 20. If the investigation cannot establish a safe executable path or binding execution overlay from current authoritative evidence, stop the workflow and raise an `ADJUDICATION_INSUFFICIENT_EVIDENCE` exception report.
 21. Do not silently reinterpret the plan and do not keep iterating the same unsatisfiable review loop.
 22. Every start-action subagent must invoke its role-local skill before acting, and must re-invoke that same role-local skill after compaction if loaded-skill memory is lost.
-23. Empty subagent output is not a result, verdict, blocker, drift evidence, or progress. It means the role session may have been interrupted before responding. For that empty turn, send exactly `continue` to that same `task_id` and do nothing else for that role. Classify the next response fresh: empty output gets another exact `continue`; non-empty invalid output gets full context repair; valid output follows its normal branch.
-24. Non-empty but invalid, malformed, or nonconforming role output is also not progress, but it is a context-repair problem rather than an interruption. Send a full corrective context prompt to the same `task_id` using the normal subagent prompt contract for that role. Do not switch sessions, self-implement, self-review, dispatch a dependent role, checkpoint, or report progress.
+23. Empty subagent output is not a result, verdict, blocker, drift evidence, or progress. It means the role thread may have been interrupted before responding. For that empty turn, continue that same role thread with exactly `continue` using the platform's same-thread continuation primitive and do nothing else for that role. Classify the next response fresh: empty output gets another exact `continue`; non-empty invalid output gets full context repair; valid output follows its normal branch.
+24. Non-empty but invalid, malformed, or nonconforming role output is also not progress, but it is a context-repair problem rather than an interruption. Send a full corrective context prompt to that same role thread using the platform's same-thread continuation primitive and the normal subagent prompt contract for that role. Do not switch role threads, self-implement, self-review, dispatch a dependent role, checkpoint, or report progress.
 
 ## Workflow Skeleton
 
-### 0. Worktree Scaffold
+### 0. Workspace Scaffold
 
 Before any implementation task:
 
-1. Check whether `<repo>/.worktrees/` exists.
-2. If missing, create it.
-3. Check whether `.gitignore` ignores `.worktrees/`.
-4. If `.worktrees/` is not ignored, add it on the current mainline branch and create the required chore commit.
-5. Create the task worktree under:
-   - single repo: `<repo>/.worktrees/<branch-name>/`
-   - multi repo: `<each-repo>/.worktrees/<branch-name>/`
-6. Inside the worktree, create `docs/superpowers/specs/`, `docs/superpowers/plans/`, and `docs/superpowers/drift-adjudication/`.
-7. Copy the immutable spec and plan docs into the corresponding worktree docs paths.
-8. Resolve one drift adjudication ledger path under `docs/superpowers/drift-adjudication/`, reusing the immutable plan basename when possible.
-9. Create the ledger file before any implementation or review subagent runs. Seed it with the immutable spec path, immutable plan path, and an empty `## Active Adjudications Summary` section.
-10. Install project dependencies inside the worktree.
-11. Verify the baseline test suite in the worktree.
+1. Invoke `using-git-worktrees`.
+2. Let that skill determine whether you are already in an isolated workspace, should create a native isolated workspace, should fall back to manual git worktree creation, or should work in place.
+3. Resolve one workspace absolute path for this workflow. That workspace may be the current repo checkout, a platform-managed isolated workspace, or a manual git worktree.
+4. Inside the resolved workspace, create `docs/superpowers/specs/`, `docs/superpowers/plans/`, and `docs/superpowers/drift-adjudication/`.
+5. Copy the immutable spec and plan docs into the corresponding workspace docs paths.
+6. Resolve one drift adjudication ledger path under `docs/superpowers/drift-adjudication/`, reusing the immutable plan basename when possible.
+7. Create the ledger file before any implementation or review subagent runs. Seed it with the immutable spec path, immutable plan path, and an empty `## Active Adjudications Summary` section.
+8. Install project dependencies inside the resolved workspace if setup is required.
+9. Verify the baseline test suite in that same workspace.
+10. If the platform already provided linked-worktree or detached-HEAD isolation, keep following `using-git-worktrees` and `finishing-a-development-branch` rules for branch creation, push, PR, and cleanup. Do not fight the harness by layering an unmanaged `.worktrees/` inside it.
+11. If `using-git-worktrees` falls back to manual git worktrees, follow that skill's ignore verification, directory choice, and cleanup rules instead of inventing a second local convention here.
 
 If the baseline is red and the CTO gave no special instruction, stop the workflow and raise an exception report. That is an allowed terminal state.
 
@@ -119,18 +143,18 @@ For each task or task-group, follow this loop:
 1. Spawn one fresh implementer.
 2. Do not prompt, run, or otherwise advance reviewers until the implementer returns valid `DONE` or `DONE_WITH_CONCERNS` for the current scope.
 3. Implementer returns one of `DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT`, `BLOCKED`, or `PLAN_DRIFT_EVIDENCE`.
-   - If the implementer returns empty output, send exactly `continue` to that same implementer `task_id`. Do not add context, switch sessions, implement yourself, dispatch reviewers, report progress, or treat the scope as advanced.
-   - If the implementer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective implementer prompt to that same implementer `task_id`. The prompt must include the full subagent and implementer prompt contracts, role-local skill invocation, authoritative paths, current progress state, assigned scope, valid status list, and second-round `pua` plus `systematic-debugging` instruction when applicable.
-4. If the implementer returns `NEEDS_CONTEXT`, provide the missing context and continue the same scope with the same implementer session.
+   - If the implementer returns empty output, continue that same implementer thread with exactly `continue`. Do not add context, switch role threads, implement yourself, dispatch reviewers, report progress, or treat the scope as advanced.
+   - If the implementer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective implementer prompt to that same implementer thread. The prompt must include the full subagent and implementer prompt contracts, role-local skill invocation, authoritative paths, current progress state, assigned scope, valid status list, and second-round `pua` plus `systematic-debugging` instruction when applicable.
+4. If the implementer returns `NEEDS_CONTEXT`, provide the missing context and continue the same scope with the same implementer thread.
 5. If the implementer returns `BLOCKED`, decide whether the blocker is resolvable without changing the immutable spec or adjudicating plan drift. If yes, provide the needed direction and continue the same scope. If no, stop the current scope and raise an exception report.
 6. If the implementer returns `PLAN_DRIFT_EVIDENCE`, pause the affected scope and run a P9-controlled adjudication loop before deciding whether execution can continue.
 7. If the implementer returns `DONE` or `DONE_WITH_CONCERNS`, spawn or prompt one fresh spec reviewer and one fresh code reviewer, then send the exact completion claims and any concerns to both reviewers.
 8. Spec reviewer checks immutable spec alignment first, then whether the frozen plan still functions as a valid derived guide for that same scope.
 9. Code reviewer checks correctness, regressions, quality, and whether actual repo or worktree evidence proves the frozen plan step stale or unexecutable for that same scope.
 10. Classify each reviewer response before advancing:
-    - If either reviewer returns empty output, send exactly `continue` to that same reviewer `task_id`. Do not add context, switch sessions, self-review, run the next dependent role, checkpoint, report progress, or treat the review as advanced.
-    - If either reviewer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective reviewer prompt to that same reviewer `task_id`. The prompt must include the full subagent and reviewer prompt contracts, role-local skill invocation, authoritative paths, current progress state, assigned scope, implementation claims or review inputs, valid verdict list, and second-round `pua` plus `systematic-debugging` instruction when applicable.
-    - If either reviewer returns `NEEDS_CONTEXT`, resend the missing authoritative inputs to that same reviewer session and repeat the same review round.
+    - If either reviewer returns empty output, continue that same reviewer thread with exactly `continue`. Do not add context, switch role threads, self-review, run the next dependent role, checkpoint, report progress, or treat the review as advanced.
+    - If either reviewer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective reviewer prompt to that same reviewer thread. The prompt must include the full subagent and reviewer prompt contracts, role-local skill invocation, authoritative paths, current progress state, assigned scope, implementation claims or review inputs, valid verdict list, and second-round `pua` plus `systematic-debugging` instruction when applicable.
+    - If either reviewer returns `NEEDS_CONTEXT`, resend the missing authoritative inputs to that same reviewer thread and repeat the same review round.
 11. If either reviewer produces plan drift evidence, pause the affected scope and run a P9-controlled adjudication loop before deciding whether execution can continue.
 12. In the adjudication loop, spawn fresh read-only investigation subagents to compare the immutable spec, the frozen plan, the drift adjudication ledger, and actual repo or worktree evidence. They may read files and run read-only verification commands, but may not modify files.
 13. If the adjudication concludes `EXECUTABLE_AS_WRITTEN` or `PLAN_DRIFT_CONTINUE_SAFE`, append a ledger entry and update the active summary before resuming. Continue the scope under the effective execution contract recorded there.
@@ -147,9 +171,9 @@ Do not return to the user after one checkpoint. Continue until all scopes are co
 
 - Across separate tasks or task-groups, spawn new subagents.
 - Do not reuse the implementer or reviewers from the previous task.
-- Inside a single task loop, keep talking to the same three role sessions.
-- Empty output never creates a cross-task reset. It is zero progress inside the current task loop; keep the same role session and prompt only `continue` for that empty turn, then reclassify the next response fresh.
-- Invalid, malformed, or nonconforming non-empty output also never creates a cross-task reset. It is zero progress that requires a full corrective context prompt to the same role session, not a new session.
+- Inside a single task loop, keep talking to the same three role threads.
+- Empty output never creates a cross-task reset. It is zero progress inside the current task loop; keep the same role thread and prompt only `continue` for that empty turn, then reclassify the next response fresh.
+- Invalid, malformed, or nonconforming non-empty output also never creates a cross-task reset. It is zero progress that requires a full corrective context prompt to the same role thread, not a new thread.
 
 ### 3. Final Whole-Branch Loop
 
@@ -198,15 +222,16 @@ Stop conditions:
 Before claiming completion:
 
 1. Invoke `verification-before-completion`.
-2. Verify the required evidence in the worktree branch.
+2. Verify the required evidence in the resolved workspace or worktree branch.
 3. Invoke `finishing-a-development-branch`.
 
 ## Drift Adjudication Ledger
 
-Create exactly one worktree-local ledger per `start-action` workflow under `docs/superpowers/drift-adjudication/`. Reuse the immutable plan basename when possible, for example:
+Create exactly one workspace-local ledger per `start-action` workflow under `docs/superpowers/drift-adjudication/`. Reuse the immutable plan basename when possible, for example:
 
-- immutable plan: `/repo/.worktrees/<branch>/docs/superpowers/plans/2026-04-13-data-sync.md`
-- drift ledger: `/repo/.worktrees/<branch>/docs/superpowers/drift-adjudication/2026-04-13-data-sync.md`
+- workspace: `<workspace>/`
+- immutable plan: `<workspace>/docs/superpowers/plans/2026-04-13-data-sync.md`
+- drift ledger: `<workspace>/docs/superpowers/drift-adjudication/2026-04-13-data-sync.md`
 
 This ledger is the durable execution-stage overlay artifact. It records already-adjudicated plan drift and the effective execution contract later agents must follow.
 
@@ -262,7 +287,7 @@ Checkpoint commit granularity follows reviewer granularity.
 
 Every subagent prompt must include:
 
-- worktree absolute path
+- workspace absolute path
 - immutable spec absolute path
 - immutable plan absolute path
 - drift adjudication ledger absolute path
@@ -290,7 +315,7 @@ Every subagent prompt must also include one explicit compaction-resume instructi
 
 Reviewer prompts must additionally include:
 
-- You are a reviewer only. Do not modify repo or worktree files.
+- You are a reviewer only. Do not modify repo or workspace files.
 - Read-only bash verification and probe scripts are allowed and encouraged.
 - Do not run destructive commands.
 - Re-read the immutable spec, the frozen plan, and the drift adjudication ledger before reviewing the current scope.
@@ -349,20 +374,20 @@ If a subtask is frontend-related, explicitly instruct the subagent to load relev
 - Within the main task loop, spec reviewer and code reviewer may run in parallel for the same granularity once the implementer has finished the current scope.
 - No checkpoint commit before both are converged.
 - During final and regression stages, the paired spec and code reviewers also run in parallel.
-- A reviewer that returns empty output has not run for workflow purposes. Do not start a dependent next role, checkpoint, or convergence decision from that non-result; send exactly `continue` to that same reviewer session.
-- A reviewer that returns a non-empty invalid, malformed, or nonconforming verdict has not run for workflow purposes. Do not start a dependent next role, checkpoint, or convergence decision from that non-result; send a full corrective reviewer prompt to that same reviewer session.
+- A reviewer that returns empty output has not run for workflow purposes. Do not start a dependent next role, checkpoint, or convergence decision from that non-result; continue that same reviewer thread with exactly `continue`.
+- A reviewer that returns a non-empty invalid, malformed, or nonconforming verdict has not run for workflow purposes. Do not start a dependent next role, checkpoint, or convergence decision from that non-result; send a full corrective reviewer prompt to that same reviewer thread.
 
 ## Exception State
 
 Allowed hard stop:
 
-- Worktree scaffold or baseline verification reveals a red baseline and the CTO gave no special override.
+- Workspace scaffold or baseline verification reveals a red baseline and the CTO gave no special override.
 - P9 adjudication concludes that the immutable spec itself must change before work can safely continue.
 - P9 adjudication cannot establish a safe executable path or binding execution overlay from current authoritative evidence.
 
 When this happens, raise an exception report with:
 
-- repo or worktree absolute path
+- repo or workspace absolute path
 - immutable spec absolute path
 - immutable plan absolute path
 - drift adjudication ledger absolute path
@@ -397,17 +422,17 @@ When this happens, raise an exception report with:
 | "The handoff says next steps are to fix reviewer findings, so I should start with debugging or implementation skills" | No. A main agent with dispatch capability must reload `start-action` first; the next steps are P9 workflow state for subagents. |
 | "This is almost done, so I should invoke finishing-a-development-branch" | No. Final review findings, unresolved fixes, or missing regression convergence mean the `start-action` workflow is still active. |
 | "I see spec, plan, ledger, and worktree paths, so I can continue from the notes without reloading the workflow" | No. Those are the compaction signals that require `start-action`. |
-| "The subagent returned empty five times, so the session is dead and I should replace it" | No. Empty output is zero progress, not permission to swap sessions. Prompt the same `task_id` with exactly `continue` for each empty turn, then reclassify the next response fresh. |
-| "The subagent returned malformed output, so I should replace it" | No. Malformed non-empty output is usually context loss or unloaded role skill. Send a full corrective context prompt to the same `task_id`. |
+| "The subagent returned empty five times, so the session is dead and I should replace it" | No. Empty output is zero progress, not permission to swap role identity. Prompt the same role thread with exactly `continue` for each empty turn, then reclassify the next response fresh. |
+| "The subagent returned malformed output, so I should replace it" | No. Malformed non-empty output is usually context loss or unloaded role skill. Send a full corrective context prompt to the same role thread. |
 | "A bare `continue` did not work after empty responses, so I should send a fuller corrective prompt" | No. For truly empty output, use exactly `continue` verbatim so you do not drown the interrupted session's context window. |
-| "The response is invalid, so I should send only `continue`" | No. A non-empty invalid response shows the subagent responded without following the role contract. Repair context with the full detailed prompt to the same `task_id`. |
-| "The reviewer is empty, so I can inspect the code myself or ask the next reviewer anyway" | No. A missing verdict blocks the workflow. Same reviewer `task_id`, exactly `continue`, no self-review and no dependent role advancement. |
+| "The response is invalid, so I should send only `continue`" | No. A non-empty invalid response shows the subagent responded without following the role contract. Repair context with the full detailed prompt to the same role thread. |
+| "The reviewer is empty, so I can inspect the code myself or ask the next reviewer anyway" | No. A missing verdict blocks the workflow. Same reviewer thread, exactly `continue`, no self-review and no dependent role advancement. |
 
 ## Red Flags
 
 - Reading large amounts of code or editing code yourself instead of dispatching.
 - Returning progress before the whole workflow finishes.
-- Forgetting to scaffold `.worktrees/` and docs copies.
+- Forgetting to run workspace scaffold and docs copies before execution.
 - Letting baseline red tests slide.
 - Allowing commits before both reviewers converge.
 - Reusing subagents across different tasks.
@@ -420,7 +445,7 @@ When this happens, raise an exception report with:
 - Jumping straight to a terminal adjudication state without running the adjudication loop.
 - Keeping an unsatisfiable review loop running after adjudication already established that a frozen plan step is wrong.
 - Treating empty subagent output, missing status, malformed status, or invalid verdict as progress.
-- Replacing a same-scope implementer, reviewer, final reviewer, regression reviewer, investigator, or fix implementer before the previous same-role session returns a valid workflow result.
+- Replacing a same-scope implementer, reviewer, final reviewer, regression reviewer, investigator, or fix implementer before the previous same-role thread returns a valid workflow result.
 - Sending anything other than exactly `continue` to a same-role subagent after truly empty output.
 - Sending only `continue` after a non-empty invalid, malformed, or nonconforming role response instead of repairing context with the full same-role prompt contract.
 - Implementing, reviewing, fixing, checkpointing, or reporting because the active subagent has not produced a valid result.

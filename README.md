@@ -73,7 +73,7 @@ Upstream: <https://github.com/pbakaus/impeccable>
 
 ## Included Skills
 
-This repository is intentionally small. At the moment it contains seven skills.
+This repository is intentionally small. At the moment it contains nine skills.
 
 ### `start-recap`
 
@@ -157,7 +157,7 @@ It is designed for situations where:
 Its job is to:
 
 - enforce execution against immutable spec and plan documents
-- persist adjudicated plan drift in a worktree-local ledger so compaction and handoff do not re-litigate settled execution contracts
+- persist adjudicated plan drift in a workspace-local ledger so compaction and handoff do not re-litigate settled execution contracts
 - separate implementer, spec reviewer, and code reviewer responsibilities
 - keep the controller in an orchestration role instead of letting it become an ad hoc implementer
 - require review convergence before advancing task scopes
@@ -264,6 +264,11 @@ That footprint is still deliberate. This repository should stay focused on orche
 
 This repository uses the standard `SKILL.md` layout, so each skill directory can be copied into any agent tool that supports skill folders.
 
+The documented platform targets in this repository are currently:
+
+- OpenCode
+- Codex
+
 For OpenCode, for example, you can install these skills at either the project level or the global level.
 
 Project-level install:
@@ -296,6 +301,21 @@ cp -r SKILLS/start-action ~/.config/opencode/skills/
 cp -r SKILLS/start-summary ~/.config/opencode/skills/
 ```
 
+For Codex, a straightforward global install is:
+
+```bash
+mkdir -p ~/.codex/skills/superpowers-companion
+cp -r SKILLS/execute-implementation-scope ~/.codex/skills/superpowers-companion/
+cp -r SKILLS/investigate-plan-drift ~/.codex/skills/superpowers-companion/
+cp -r SKILLS/review-code-quality ~/.codex/skills/superpowers-companion/
+cp -r SKILLS/review-start-summary-plan ~/.codex/skills/superpowers-companion/
+cp -r SKILLS/review-start-summary-spec ~/.codex/skills/superpowers-companion/
+cp -r SKILLS/review-spec-alignment ~/.codex/skills/superpowers-companion/
+cp -r SKILLS/start-recap ~/.codex/skills/superpowers-companion/
+cp -r SKILLS/start-action ~/.codex/skills/superpowers-companion/
+cp -r SKILLS/start-summary ~/.codex/skills/superpowers-companion/
+```
+
 If you use another tool with a similar skill directory convention, the same approach applies: copy each skill folder, including its `SKILL.md`, into that tool's skill directory.
 
 If you plan to use the full document-driven workflow, install all nine skills. `start-summary` requires the two role-local reviewer skills during document convergence, and `start-action` still requires the four role-local skills at execution time for its subagents.
@@ -304,6 +324,29 @@ Before installing this repository, make sure the upstream dependencies you expec
 
 - the role and execution skills from `pua`
 - the design, planning, debugging, and verification skills from `superpowers`
+
+## Platform Adaptation
+
+These skills are written to be read inside the host agent platform and then adapted at runtime to that platform's orchestration primitives. The controller skills in this repository, especially `start-summary` and `start-action`, now require an explicit platform check before dispatching reviewers, implementers, or workspace-isolation logic.
+
+OpenCode adaptation:
+
+- Same-role thread identity means the same `task_id`.
+- Empty output means send exactly `continue` to that same `task_id`.
+- Non-empty invalid output means resend the full corrective prompt to that same `task_id`.
+- Use OpenCode subagents that can load installed role-local skills.
+
+Codex adaptation:
+
+- Same-role thread identity means the same spawned-agent thread or agent id.
+- Initial dispatch maps to `spawn_agent`.
+- Continuing the same role thread maps to `send_input`.
+- Waiting for the next result maps to `wait_agent`.
+- Closing a finished role thread maps to `close_agent`.
+- Controller-visible task tracking maps to `update_plan`.
+- Workspace isolation should prefer upstream `using-git-worktrees`, including native-workspace detection and git-worktree fallback when needed.
+
+All supported platforms must preserve the same role identity for repeated rounds on the same document or scope. If the platform cannot preserve same-role identity while also letting the role load its local workflow skill, surface that mismatch explicitly instead of silently degrading into fresh-session retries.
 
 ## Usage Notes
 

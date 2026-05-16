@@ -7,7 +7,7 @@ description: Use when a main agent with subagent-dispatch capability sees compac
 
 ## Overview
 
-Turn the last approved summary or design recap into two on-disk documents in two locked phases: converge the spec first, freeze it, re-read the frozen spec fresh, then derive and converge the implementation plan from that immutable spec. Do not reopen brainstorming. Do not leave optional wording about product behavior, scope, contracts, sequencing, or verification. Use one persistent reviewer session for the spec and one persistent reviewer session for the plan until each passes. The frozen plan is a derived coordination document, not a second point of truth equal to the frozen spec.
+Turn the last approved summary or design recap into two on-disk documents in two locked phases: converge the spec first, freeze it, re-read the frozen spec fresh, then derive and converge the implementation plan from that immutable spec. Do not reopen brainstorming. Do not leave optional wording about product behavior, scope, contracts, sequencing, or verification. Use one persistent reviewer thread for the spec and one persistent reviewer thread for the plan until each passes. The frozen plan is a derived coordination document, not a second point of truth equal to the frozen spec.
 
 ## Compaction And Handoff Trigger
 
@@ -45,13 +45,32 @@ Do not use this skill when the discussion is settled but the recap is still ad h
 - Do not invoke `brainstorming` again just because the upstream material came from a design discussion. The final recap is already the approved design input.
 - Do not use `review-spec-alignment` or `review-code-quality` in this workflow. Those are `start-action` implementation-review skills, not `start-summary` draft-convergence skills.
 
+## Platform Adaptation
+
+Before dispatching reviewers, identify the platform primitive that preserves one reviewer thread per document through repeated rounds.
+
+- OpenCode:
+  - Same reviewer thread means the same `task_id`.
+  - Empty output means send exactly `continue` to that same `task_id`.
+  - Non-empty invalid output means resend the full corrective reviewer prompt to that same `task_id`.
+- Codex:
+  - Same reviewer thread means the same reviewer agent id or resumed agent thread.
+  - Initial reviewer dispatch maps to `spawn_agent`.
+  - Continuing the same reviewer thread maps to `send_input`.
+  - Waiting for the next reviewer result maps to `wait_agent`.
+  - Closing a converged reviewer thread maps to `close_agent`.
+  - If the same reviewer thread was closed accidentally but must continue, resume that same agent id instead of forking a replacement reviewer.
+- All supported platforms:
+  - Preserve the same reviewer identity for the entire spec loop and the entire plan loop.
+  - If your platform cannot preserve same-reviewer identity while still letting that reviewer load its role-local skill, stop and surface the platform mismatch explicitly instead of silently opening a fresh reviewer after every edit.
+
 ## Core Rules
 
 1. The approved recap artifact is the primary input and starting truth. Use earlier conversation only as secondary context for supporting file references, history of resolved changes, or confirmation of what the recap already settled. Do not reconstruct product truth from raw chat when the approved recap already resolved it.
 2. Write the spec first. Do not draft, outline, or derive any part of the plan until the spec reviewer returns `PASS`, the spec is frozen, and you have re-read the frozen spec fresh.
-3. The spec reviewer is one fresh reviewer session reused with the same `task_id` until `PASS`.
+3. The spec reviewer is one fresh reviewer thread reused with the same reviewer identity until `PASS`.
 4. Until the spec reviewer returns `PASS`, the spec is still a mutable draft. The spec reviewer must treat it as editable and not yet immutable.
-5. The plan reviewer is one fresh reviewer session reused with the same `task_id` until `PASS`.
+5. The plan reviewer is one fresh reviewer thread reused with the same reviewer identity until `PASS`.
 6. Every reviewer message must restate full context because reviewer memory can compact away.
 7. Every review round must re-read the current spec or plan file fresh.
 8. Remove all `optional` / `可选` / `可做可不做` wording about product behavior, scope, and data contracts in the spec, and about affected files, contract changes, sequencing, and verification in the plan. If the current authoritative artifacts already settle the meaning, replace it with a requirement, non-goal, or locked assumption. If they do not, return `NEEDS_DECISION` instead of inventing a local resolution.
@@ -69,8 +88,8 @@ Do not use this skill when the discussion is settled but the recap is still ad h
 20. Every `start-summary` reviewer subagent must invoke its role-local reviewer skill before acting, and must re-invoke that same role-local skill after compaction if loaded-skill memory is lost.
 21. The controller's pasted reviewer contract is required round context, not the reviewer's sole authority and not a substitute for the role-local reviewer skill.
 22. Do not substitute `review-spec-alignment` or `review-code-quality` here. Those skills review implemented scopes in `start-action`, not mutable draft docs in `start-summary`.
-23. Empty reviewer output is not `PASS`, `CHANGES_REQUIRED`, evidence, or progress. It means the reviewer session may have been interrupted before responding. For that empty turn, send exactly `continue` to that same `task_id` and do nothing else for that document loop. Classify the next response fresh: empty output gets another exact `continue`; non-empty invalid output gets full context repair; valid output follows its normal branch.
-24. Non-empty but invalid, malformed, or nonconforming reviewer output is also not progress, but it is a context-repair problem rather than an interruption. Send a full corrective reviewer prompt to the same `task_id` using the normal reviewer prompt contract for that document. Do not switch sessions, self-review, freeze a document, draft the next document, finalize, or report progress.
+23. Empty reviewer output is not `PASS`, `CHANGES_REQUIRED`, evidence, or progress. It means the reviewer thread may have been interrupted before responding. For that empty turn, continue that same reviewer thread with exactly `continue` using the platform's same-thread continuation primitive, and do nothing else for that document loop. Classify the next response fresh: empty output gets another exact `continue`; non-empty invalid output gets full context repair; valid output follows its normal branch.
+24. Non-empty but invalid, malformed, or nonconforming reviewer output is also not progress, but it is a context-repair problem rather than an interruption. Send a full corrective reviewer prompt to that same reviewer thread using the platform's same-thread continuation primitive. Do not switch reviewer threads, self-review, freeze a document, draft the next document, finalize, or report progress.
 
 ## Default Paths
 
@@ -98,18 +117,18 @@ Always report the absolute resolved paths, not just the repo-relative paths.
    - resolved absolute plan path
 5. Draft the spec first.
 6. Spawn one fresh spec reviewer subagent and explicitly instruct it to invoke `review-start-summary-spec` before acting.
-7. Keep using the same spec reviewer `task_id` until it returns `PASS`.
-   - If the spec reviewer returns empty output, send exactly `continue` to that same spec reviewer `task_id`. Do not add context, switch sessions, self-review, write the plan, freeze the spec, report progress, or treat the review as advanced.
-   - If the spec reviewer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective spec-reviewer prompt to that same spec reviewer `task_id`. The prompt must include the full spec reviewer prompt contract, `review-start-summary-spec` invocation, authoritative paths, current draft status, previous findings and latest changes, and the exact `CHANGES_REQUIRED|NEEDS_DECISION|PASS`, `SUGGEST_CHANGES`, `RATIONALE` response contract.
+7. Keep using the same spec reviewer thread until it returns `PASS`.
+   - If the spec reviewer returns empty output, continue that same spec reviewer thread with exactly `continue`. Do not add context, switch reviewer threads, self-review, write the plan, freeze the spec, report progress, or treat the review as advanced.
+   - If the spec reviewer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective spec-reviewer prompt to that same spec reviewer thread. The prompt must include the full spec reviewer prompt contract, `review-start-summary-spec` invocation, authoritative paths, current draft status, previous findings and latest changes, and the exact `CHANGES_REQUIRED|NEEDS_DECISION|PASS`, `SUGGEST_CHANGES`, `RATIONALE` response contract.
 8. Freeze the spec only after `PASS`. Until then it remains an editable draft.
 9. Re-read the frozen spec yourself fresh. Do not rely on memory from the drafting or review loop.
 10. Only now derive the plan from the immutable spec. Any `TASK_GROUP`, `TASK`, `STEP`, or tentative task outline counts as plan drafting.
 11. Use `writing-plans` as the canonical source for the plan's required format and sections. `TASK_GROUP` or `TASK_CHUNK` is a mandatory orchestration layer in this workflow, but it must wrap the underlying `writing-plans` task scaffold rather than replace or redefine it.
 12. Make the plan concrete about the intended implementation surface, contract changes, sequencing, and verification. Name concrete file paths when must-read repo evidence already supports them, and otherwise name the relevant code area or boundary without inventing a brittle exact route. Do not freeze local code-level details beyond what the frozen spec and must-read repo evidence actually require.
 13. Spawn one fresh plan reviewer subagent and explicitly instruct it to invoke `review-start-summary-plan` before acting.
-14. Keep using the same plan reviewer `task_id` until it returns `PASS`.
-    - If the plan reviewer returns empty output, send exactly `continue` to that same plan reviewer `task_id`. Do not add context, switch sessions, self-review, freeze the plan, finalize, report progress, or treat the review as advanced.
-    - If the plan reviewer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective plan-reviewer prompt to that same plan reviewer `task_id`. The prompt must include the full plan reviewer prompt contract, `review-start-summary-plan` invocation, authoritative paths, current draft status, previous findings and latest changes, and the exact `CHANGES_REQUIRED|NEEDS_DECISION|PASS`, `SUGGEST_CHANGES`, `RATIONALE` response contract.
+14. Keep using the same plan reviewer thread until it returns `PASS`.
+    - If the plan reviewer returns empty output, continue that same plan reviewer thread with exactly `continue`. Do not add context, switch reviewer threads, self-review, freeze the plan, finalize, report progress, or treat the review as advanced.
+    - If the plan reviewer returns non-empty but invalid, malformed, or nonconforming output, resend a full corrective plan-reviewer prompt to that same plan reviewer thread. The prompt must include the full plan reviewer prompt contract, `review-start-summary-plan` invocation, authoritative paths, current draft status, previous findings and latest changes, and the exact `CHANGES_REQUIRED|NEEDS_DECISION|PASS`, `SUGGEST_CHANGES`, `RATIONALE` response contract.
 15. Freeze the plan only after `PASS`.
 16. Report both absolute paths.
 
@@ -293,11 +312,11 @@ Review requirements:
 ## Convergence Rules
 
 - If the reviewer returns stale findings, explicitly tell it to re-read the current file fresh and ignore superseded points.
-- If the reviewer returns `CHANGES_REQUIRED` because authoritative inputs were missing after compaction or broken handoff, resend the missing authoritative inputs to that same reviewer session and continue the same document loop.
+- If the reviewer returns `CHANGES_REQUIRED` because authoritative inputs were missing after compaction or broken handoff, resend the missing authoritative inputs to that same reviewer thread and continue the same document loop.
 - If the reviewer returns `NEEDS_DECISION`, stop the current document loop, ask the user one focused clarification question, refresh the recap with the new authoritative answer, and restart `start-summary` from that updated recap instead of patching only the current draft.
-- If the reviewer returns empty output, prompt only `continue` verbatim to that same `task_id` for that empty turn, then reclassify the next response fresh.
-- If the reviewer returns non-empty but invalid, malformed, or nonconforming output, resend the full reviewer prompt contract to that same `task_id` for that invalid turn, then reclassify the next response fresh.
-- Do not discard the reviewer and open a new session. Keep the same reviewer `task_id` for that document until convergence.
+- If the reviewer returns empty output, prompt only `continue` verbatim to that same reviewer thread for that empty turn, then reclassify the next response fresh.
+- If the reviewer returns non-empty but invalid, malformed, or nonconforming output, resend the full reviewer prompt contract to that same reviewer thread for that invalid turn, then reclassify the next response fresh.
+- Do not discard the reviewer and open a new thread. Keep the same reviewer identity for that document until convergence.
 - The spec and plan reviewers must be different fresh sessions. Reusing the spec reviewer for the plan weakens separation.
 - The spec-review loop must fully converge before any plan drafting or plan review begins.
 - After the spec reviewer returns `PASS`, freeze the spec and re-read it fresh yourself before deriving the plan.
@@ -338,7 +357,7 @@ Do not carry the ambiguous wording into the final docs.
 
 | Excuse | Reality |
 |--------|---------|
-| "Parallel reviewers are faster" | This workflow requires one persistent reviewer session per document so feedback converges instead of forking. |
+| "Parallel reviewers are faster" | This workflow requires one persistent reviewer thread per document so feedback converges instead of forking. |
 | "Self-review is enough" | No. The contract requires a dedicated spec reviewer and a dedicated plan reviewer. |
 | "I can sketch rough TASK_GROUPS while the spec review is running" | No. A tentative task outline is still plan derivation. Do not draft any part of the plan before the spec passes, freezes, and is re-read fresh. |
 | "The spec can keep evolving while I write the plan" | No. The plan must be written from an immutable spec. |
@@ -359,17 +378,17 @@ Do not carry the ambiguous wording into the final docs.
 | "`writing-plans` asks for code and test snippets, so I should paste full function and test definitions" | No. Satisfy the format with snippets that lock behavior, inputs, outputs, public API, required assertions, and verification intent. Helpers and unrelated implementation detail belong to execution and review unless earlier truth forces them. |
 | "A plan without inline code or test sections can still pass because we only care about contract level" | No. Required `writing-plans` sections must still be present. The override is semantic level, not section removal. |
 | "`review-spec-alignment` or `review-code-quality` are close enough for `start-summary`" | No. Those are `start-action` implementation-review skills, not mutable draft convergence skills. |
-| "I'll open a new reviewer session after each edit" | No. Reuse the same reviewer `task_id` until `PASS` so the reviewer can converge on the latest draft. |
+| "I'll open a new reviewer session after each edit" | No. Reuse the same reviewer thread until `PASS` so the reviewer can converge on the latest draft. |
 | "I'll only fix the major findings and ignore the rest" | The reviewer must report all findings in one pass and you must resolve them before `PASS`. |
 | "Once the plan passes, it becomes co-equal truth with the spec" | No. The plan is a derived coordination document. The frozen spec remains the product truth. |
 | "If later codebase reality disproves a frozen plan step, implementation should still follow the plan" | No. Treat that as plan drift evidence. The downstream lead must adjudicate against the frozen spec and actual codebase truth. |
 | "The handoff says to write the spec and plan, so I can invoke `writing-plans` directly" | No. A main agent with dispatch capability must reload `start-summary` first so spec-first convergence and reviewer sessions survive compaction. |
 | "The recap is clear enough, so I can skip the start-summary workflow" | No. An approved recap without frozen spec and plan is exactly the handoff signal for `start-summary`. |
-| "The reviewer returned empty five times, so I should open a new reviewer session" | No. Empty output is zero progress, not permission to fork reviewer identity. Prompt the same `task_id` with exactly `continue` for each empty turn, then reclassify the next response fresh. |
-| "The reviewer returned malformed output, so I should open a new reviewer session" | No. Malformed non-empty output is usually context loss or unloaded reviewer skill. Send the full corrective reviewer prompt to the same `task_id`. |
+| "The reviewer returned empty five times, so I should open a new reviewer session" | No. Empty output is zero progress, not permission to fork reviewer identity. Prompt the same reviewer thread with exactly `continue` for each empty turn, then reclassify the next response fresh. |
+| "The reviewer returned malformed output, so I should open a new reviewer session" | No. Malformed non-empty output is usually context loss or unloaded reviewer skill. Send the full corrective reviewer prompt to the same reviewer thread. |
 | "A bare `continue` did not work after empty responses, so I should send fuller context" | No. For truly empty output, send exactly `continue` verbatim so you do not drown the interrupted session's context window. |
-| "The response is invalid, so I should send only `continue`" | No. A non-empty invalid response shows the reviewer responded without following the role contract. Repair context with the full detailed prompt to the same `task_id`. |
-| "The reviewer is silent, so self-review is enough" | No. Missing reviewer output blocks convergence. Same reviewer `task_id`, exactly `continue`, no self-review substitute. |
+| "The response is invalid, so I should send only `continue`" | No. A non-empty invalid response shows the reviewer responded without following the role contract. Repair context with the full detailed prompt to the same reviewer thread. |
+| "The reviewer is silent, so self-review is enough" | No. Missing reviewer output blocks convergence. Same reviewer thread, exactly `continue`, no self-review substitute. |
 
 ## Red Flags
 
@@ -377,8 +396,8 @@ Do not carry the ambiguous wording into the final docs.
 - Resuming from compaction or handoff notes with an approved recap and missing spec or plan but invoking `writing-plans` directly before `start-summary`.
 - Drafting any `TASK_GROUP`, `TASK`, `STEP`, or tentative task outline before the spec passes and freezes.
 - Writing the plan before the spec passes.
-- Using more than one spec reviewer session.
-- Using more than one plan reviewer session.
+- Using more than one spec reviewer thread.
+- Using more than one plan reviewer thread.
 - Letting the reviewer skip a fresh re-read of the current file.
 - Skipping the fresh self re-read of the frozen spec before plan drafting.
 - Letting the spec reviewer assume the spec is already immutable.
