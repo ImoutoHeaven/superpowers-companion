@@ -344,7 +344,7 @@ Codex adaptation:
 - Waiting for the next result maps to `wait_agent`.
 - Closing a finished role thread maps to `close_agent`.
 - Controller-visible task tracking maps to `update_plan`.
-- Workspace isolation should prefer upstream `using-git-worktrees`, including native-workspace detection and git-worktree fallback when needed.
+- Workspace isolation should prefer upstream `using-git-worktrees`, including native-workspace detection and git-worktree fallback when needed. For `start-action`, read `.gitignore` before choosing the current checkout; ignored `.worktrees/` or `worktrees/` entries are project-local worktree conventions even if the directory does not exist yet.
 
 All supported platforms must preserve the same role identity for repeated rounds on the same document or scope. If the platform cannot preserve same-role identity while also letting the role load its local workflow skill, surface that mismatch explicitly instead of silently degrading into fresh-session retries.
 

@@ -123,16 +123,20 @@ Subagents must also be told that if they are compacted and lose loaded-skill mem
 Before any implementation task:
 
 1. Invoke `using-git-worktrees`.
-2. Let that skill determine whether you are already in an isolated workspace, should create a native isolated workspace, should fall back to manual git worktree creation, or should work in place.
-3. Resolve one workspace absolute path for this workflow. That workspace may be the current repo checkout, a platform-managed isolated workspace, or a manual git worktree.
-4. Inside the resolved workspace, create `docs/superpowers/specs/`, `docs/superpowers/plans/`, and `docs/superpowers/drift-adjudication/`.
-5. Copy the immutable spec and plan docs into the corresponding workspace docs paths.
-6. Resolve one drift adjudication ledger path under `docs/superpowers/drift-adjudication/`, reusing the immutable plan basename when possible.
-7. Create the ledger file before any implementation or review subagent runs. Seed it with the immutable spec path, immutable plan path, and an empty `## Active Adjudications Summary` section.
-8. Install project dependencies inside the resolved workspace if setup is required.
-9. Verify the baseline test suite in that same workspace.
-10. If the platform already provided linked-worktree or detached-HEAD isolation, keep following `using-git-worktrees` and `finishing-a-development-branch` rules for branch creation, push, PR, and cleanup. Do not fight the harness by layering an unmanaged `.worktrees/` inside it.
-11. If `using-git-worktrees` falls back to manual git worktrees, follow that skill's ignore verification, directory choice, and cleanup rules instead of inventing a second local convention here.
+2. Before choosing the current checkout, read the repository `.gitignore` when it exists. Treat ignored `.worktrees/` or `worktrees/` entries as an explicit project-local worktree convention even when the directory has not been created yet.
+3. If `.gitignore` declares `.worktrees/` or `worktrees/`, create the manual git worktree under that ignored directory unless the platform has already provided native isolation or the user explicitly chose in-place execution. Prefer `.worktrees/` when both are declared.
+4. Confirm any project-local worktree directory with `git check-ignore` before `git worktree add`. Do not rely only on `ls -d .worktrees` or `ls -d worktrees`; absence of the directory is not evidence that in-place execution is correct.
+5. Let `using-git-worktrees` determine whether you are already in an isolated workspace, should use native isolated workspace support, should fall back to manual git worktree creation, or should work in place, but only after the `.gitignore` convention check above.
+6. Resolve one workspace absolute path for this workflow. That workspace may be the current repo checkout only when it is already an isolated workspace, the user explicitly chose in-place execution, or no project-local, native, or manual worktree path is available after the checks above.
+7. Record the workspace decision evidence before implementation starts: current branch, whether `.gitignore` was present, relevant ignored worktree entries, `git check-ignore` result for project-local paths, and the resolved workspace path.
+8. Inside the resolved workspace, create `docs/superpowers/specs/`, `docs/superpowers/plans/`, and `docs/superpowers/drift-adjudication/`.
+9. Copy the immutable spec and plan docs into the corresponding workspace docs paths.
+10. Resolve one drift adjudication ledger path under `docs/superpowers/drift-adjudication/`, reusing the immutable plan basename when possible.
+11. Create the ledger file before any implementation or review subagent runs. Seed it with the immutable spec path, immutable plan path, the workspace decision evidence, and an empty `## Active Adjudications Summary` section.
+12. Install project dependencies inside the resolved workspace if setup is required.
+13. Verify the baseline test suite in that same workspace.
+14. If the platform already provided linked-worktree or detached-HEAD isolation, keep following `using-git-worktrees` and `finishing-a-development-branch` rules for branch creation, push, PR, and cleanup. Do not fight the harness by layering an unmanaged `.worktrees/` inside it.
+15. If `using-git-worktrees` falls back to manual git worktrees, follow that skill's ignore verification, directory choice, and cleanup rules instead of inventing a second local convention here.
 
 If the baseline is red and the CTO gave no special instruction, stop the workflow and raise an exception report. That is an allowed terminal state.
 
@@ -422,6 +426,8 @@ When this happens, raise an exception report with:
 | "The handoff says next steps are to fix reviewer findings, so I should start with debugging or implementation skills" | No. A main agent with dispatch capability must reload `start-action` first; the next steps are P9 workflow state for subagents. |
 | "This is almost done, so I should invoke finishing-a-development-branch" | No. Final review findings, unresolved fixes, or missing regression convergence mean the `start-action` workflow is still active. |
 | "I see spec, plan, ledger, and worktree paths, so I can continue from the notes without reloading the workflow" | No. Those are the compaction signals that require `start-action`. |
+| "No `.worktrees/` directory exists, so I should use the current checkout" | No. Read `.gitignore` first. An ignored `.worktrees/` or `worktrees/` entry is a project-local worktree convention even before the directory exists. |
+| "I ran `ls -d .worktrees` and `ls -d worktrees`, so workspace selection is done" | No. Directory existence is insufficient. Check `.gitignore`, confirm project-local paths with `git check-ignore`, and record the decision evidence before implementation. |
 | "The subagent returned empty five times, so the session is dead and I should replace it" | No. Empty output is zero progress, not permission to swap role identity. Prompt the same role thread with exactly `continue` for each empty turn, then reclassify the next response fresh. |
 | "The subagent returned malformed output, so I should replace it" | No. Malformed non-empty output is usually context loss or unloaded role skill. Send a full corrective context prompt to the same role thread. |
 | "A bare `continue` did not work after empty responses, so I should send a fuller corrective prompt" | No. For truly empty output, use exactly `continue` verbatim so you do not drown the interrupted session's context window. |
@@ -433,6 +439,8 @@ When this happens, raise an exception report with:
 - Reading large amounts of code or editing code yourself instead of dispatching.
 - Returning progress before the whole workflow finishes.
 - Forgetting to run workspace scaffold and docs copies before execution.
+- Selecting the current checkout before reading `.gitignore` and checking ignored project-local worktree paths.
+- Treating a missing `.worktrees/` or `worktrees/` directory as permission to skip manual worktree creation.
 - Letting baseline red tests slide.
 - Allowing commits before both reviewers converge.
 - Reusing subagents across different tasks.
