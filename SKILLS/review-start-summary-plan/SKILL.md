@@ -66,6 +66,7 @@ If any authoritative input is missing, stale, or only implied from partial hando
    - whether file paths are concrete when repo evidence supports them, or properly scoped to a code area when it does not
    - whether the plan overfreezes helper names, full function bodies, helper internals, or unrelated implementation detail
    - whether the draft uses valid coordination-level representations (for example comments, logic-flow bullets, API skeletons, contract tables, assertion skeletons, or verification matrices) when those forms keep behavior and verification executable without overfreezing local internals
+   - whether a plan targeting `start-action` preserves actual git checkpoint commits instead of replacing them with non-commit checkpoint steps, diff snapshots, or status reports
    - unresolved product, business, or behavior decisions that the frozen spec does not actually settle but the plan is trying to choose anyway
 7. Return all blocking findings in one pass.
 
@@ -113,6 +114,7 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 - Do not remove required `writing-plans` sections just because the plan stays at contract level.
 - Do not force exact helper names, full function bodies, helper internals, or one brittle file route unless the frozen spec or repo evidence requires them.
 - Do not use `no ambiguity` as a reason to demand full function bodies, helper internals, full test bodies, or transcript-level local wiring.
+- Do not approve a `start-action` plan that replaces required git checkpoint commits with non-commit checkpoint steps because of generic no-commit guidance.
 - Do not reject a plan only because it uses comments, logic flow, API skeletons, contract tables, assertion skeletons, or verification matrices instead of near-final implementation snippets.
 - Do not iterate the plan toward full detailed copy-paste transcript detail when the remaining variance is local implementation latitude rather than coordination ambiguity.
 - Treat the ban on full detailed copy-paste transcript plans as a higher-priority guardrail than any broad reading of `no ambiguity`.
@@ -134,6 +136,7 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 | "If some authoritative input is missing, I should still give the best review I can" | No. Return `CHANGES_REQUIRED` and request the missing authoritative inputs explicitly. |
 | "The spec is frozen, so I should salvage the plan by choosing one concrete product behavior" | No. A frozen but under-settled spec does not authorize plan-level product decisions. Return `NEEDS_DECISION`. |
 | "I can just tell the controller to revise the plan wording while keeping the same hidden behavior choice" | No. If the hidden choice is a material unresolved decision, it is `NEEDS_DECISION`, not ordinary wording cleanup. |
+| "The plan says checkpoint step, so that probably satisfies `start-action` without commits" | No. `start-action` checkpoint commits are actual git commits. A non-commit substitute is a blocking plan defect. |
 
 ## Red Flags
 
@@ -142,6 +145,7 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 - You are checking only the latest deltas without re-reading the authoritative artifacts.
 - You are treating the frozen plan as co-equal truth with the frozen spec.
 - You are pushing the plan into a copy-paste implementation transcript.
+- You are about to approve a `start-action` plan that downgrades checkpoint commits into uncommitted checkpoints.
 - You are treating implementation latitude as reviewable ambiguity.
 - You are repeating "still ambiguous" findings that would disappear only if the plan became a transcript.
 - You are about to frame a real unresolved product or behavior decision as ordinary `CHANGES_REQUIRED` instead of `NEEDS_DECISION`.
@@ -153,6 +157,7 @@ If you are resumed after compaction or replaced by a fresh reviewer:
 - Treating comment-level or logic-flow-level planning as automatically insufficient even when behavior and verification are fully locked.
 - Continuing silently when the role-local skill is unavailable instead of surfacing the workflow mismatch.
 - Letting the plan choose a product behavior that the frozen spec never actually froze.
+- Letting generic no-commit planning guidance override `start-action`'s required git checkpoint commits.
 
 ## Bottom Line
 

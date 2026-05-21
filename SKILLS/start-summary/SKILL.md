@@ -168,6 +168,8 @@ The only plan-shape delta this skill adds is:
 
 If the repo requires a stricter downstream execution workflow than the default `writing-plans` header names, state that requirement immediately after the preserved `writing-plans` header instead of silently rewriting the header contract.
 
+If the downstream workflow is `start-action`, the plan must preserve that workflow's real git checkpoint-commit requirement. Do not replace checkpoint commits with non-commit checkpoint steps, diff snapshots, or status reports because of generic `writing-plans` or workspace guidance about not committing without explicit user wording.
+
 ## Truth Hierarchy
 
 - The frozen spec is the product and behavior truth.
@@ -382,6 +384,7 @@ Do not carry the ambiguous wording into the final docs.
 | "I'll only fix the major findings and ignore the rest" | The reviewer must report all findings in one pass and you must resolve them before `PASS`. |
 | "Once the plan passes, it becomes co-equal truth with the spec" | No. The plan is a derived coordination document. The frozen spec remains the product truth. |
 | "If later codebase reality disproves a frozen plan step, implementation should still follow the plan" | No. Treat that as plan drift evidence. The downstream lead must adjudicate against the frozen spec and actual codebase truth. |
+| "Generic planning guidance says not to commit unless explicitly requested, so the `start-action` plan should use non-commit checkpoints" | No. When the plan targets `start-action`, preserve real git checkpoint commits at reviewer granularity. The execution workflow is the explicit authorization. |
 | "The handoff says to write the spec and plan, so I can invoke `writing-plans` directly" | No. A main agent with dispatch capability must reload `start-summary` first so spec-first convergence and reviewer sessions survive compaction. |
 | "The recap is clear enough, so I can skip the start-summary workflow" | No. An approved recap without frozen spec and plan is exactly the handoff signal for `start-summary`. |
 | "The reviewer returned empty five times, so I should open a new reviewer session" | No. Empty output is zero progress, not permission to fork reviewer identity. Prompt the same reviewer thread with exactly `continue` for each empty turn, then reclassify the next response fresh. |
@@ -418,6 +421,7 @@ Do not carry the ambiguous wording into the final docs.
 - Freezing local code-level choices that the frozen spec does not require and the must-read repo evidence does not force.
 - Treating the frozen plan as a second point of truth equal to the frozen spec.
 - Leaving no downstream rule for investigation and adjudication when real codebase analysis disproves a frozen plan step.
+- Replacing `start-action` git checkpoint commits with non-commit checkpoint steps in the frozen plan.
 - Treating empty reviewer output, missing verdict, malformed verdict, or invalid verdict as progress.
 - Replacing the spec or plan reviewer because it returned empty, invalid, malformed, or nonconforming output.
 - Sending anything other than exactly `continue` to a reviewer after truly empty output.

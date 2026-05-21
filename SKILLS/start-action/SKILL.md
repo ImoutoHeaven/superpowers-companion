@@ -100,21 +100,22 @@ Subagents must also be told that if they are compacted and lose loaded-skill mem
 7. Every reviewer may run read-only verification commands and probe scripts, but may not modify repo or workspace files.
 8. If a task enters a second implementation or review round, all later rounds for that task must explicitly invoke `pua` and `systematic-debugging` in the subagent prompt.
 9. No implementer commits before spec review and code review both converge for that task granularity.
-10. After both reviews converge, require the implementer to create the checkpoint commit before you advance.
-11. The immutable spec is the product and behavior truth. The real repo or worktree is the executability truth. The immutable plan is a derived coordination artifact, not a co-equal point of truth.
-12. The drift adjudication ledger is a durable execution-stage overlay artifact for this workflow. It never overrides the immutable spec or actual repo or worktree truth.
-13. The drift adjudication ledger does override literal reuse of any frozen plan step already adjudicated stale for this workflow until a later adjudication supersedes that entry.
-14. If a frozen plan step conflicts with the immutable spec, the spec wins.
-15. If a frozen plan step is proven unexecutable as written against the repo or worktree, or executable only by drifting from the immutable spec, that is plan drift evidence.
-16. Do not make the code worse, less correct, or spec-drifting just to preserve alignment with a wrong plan step.
-17. When plan drift evidence appears, P9 must pause the affected scope, dispatch fresh investigation subagents, and adjudicate against the immutable spec plus actual repo or worktree evidence.
-18. If the investigation shows the plan step is wrong but the work can continue safely while respecting the immutable spec and actual repo or worktree truth, P9 must append a durable ledger entry before execution resumes.
-19. If the investigation shows the immutable spec itself must change before work can safely continue, stop the workflow and raise a `SPEC_RECONVERGENCE_REQUIRED` exception report.
-20. If the investigation cannot establish a safe executable path or binding execution overlay from current authoritative evidence, stop the workflow and raise an `ADJUDICATION_INSUFFICIENT_EVIDENCE` exception report.
-21. Do not silently reinterpret the plan and do not keep iterating the same unsatisfiable review loop.
-22. Every start-action subagent must invoke its role-local skill before acting, and must re-invoke that same role-local skill after compaction if loaded-skill memory is lost.
-23. Empty subagent output is not a result, verdict, blocker, drift evidence, or progress. It means the role thread may have been interrupted before responding. For that empty turn, continue that same role thread with exactly `continue` using the platform's same-thread continuation primitive and do nothing else for that role. Classify the next response fresh: empty output gets another exact `continue`; non-empty invalid output gets full context repair; valid output follows its normal branch.
-24. Non-empty but invalid, malformed, or nonconforming role output is also not progress, but it is a context-repair problem rather than an interruption. Send a full corrective context prompt to that same role thread using the platform's same-thread continuation primitive and the normal subagent prompt contract for that role. Do not switch role threads, self-implement, self-review, dispatch a dependent role, checkpoint, or report progress.
+10. After both reviews converge, require the implementer to create an actual git checkpoint commit before you advance.
+11. `start-action` itself is explicit user authorization for these workflow checkpoint commits. If the frozen plan, generic workspace guidance, or inherited `writing-plans` language says not to commit unless the user explicitly requests it, that instruction is superseded for `start-action` checkpoint commits. Treat any plan step that replaces git commits with non-commit checkpoints as stale derived coordination, record plan drift if needed, and still checkpoint-commit after review convergence.
+12. The immutable spec is the product and behavior truth. The real repo or worktree is the executability truth. The immutable plan is a derived coordination artifact, not a co-equal point of truth.
+13. The drift adjudication ledger is a durable execution-stage overlay artifact for this workflow. It never overrides the immutable spec or actual repo or worktree truth.
+14. The drift adjudication ledger does override literal reuse of any frozen plan step already adjudicated stale for this workflow until a later adjudication supersedes that entry.
+15. If a frozen plan step conflicts with the immutable spec, the spec wins.
+16. If a frozen plan step is proven unexecutable as written against the repo or worktree, or executable only by drifting from the immutable spec, that is plan drift evidence.
+17. Do not make the code worse, less correct, or spec-drifting just to preserve alignment with a wrong plan step.
+18. When plan drift evidence appears, P9 must pause the affected scope, dispatch fresh investigation subagents, and adjudicate against the immutable spec plus actual repo or worktree evidence.
+19. If the investigation shows the plan step is wrong but the work can continue safely while respecting the immutable spec and actual repo or worktree truth, P9 must append a durable ledger entry before execution resumes.
+20. If the investigation shows the immutable spec itself must change before work can safely continue, stop the workflow and raise a `SPEC_RECONVERGENCE_REQUIRED` exception report.
+21. If the investigation cannot establish a safe executable path or binding execution overlay from current authoritative evidence, stop the workflow and raise an `ADJUDICATION_INSUFFICIENT_EVIDENCE` exception report.
+22. Do not silently reinterpret the plan and do not keep iterating the same unsatisfiable review loop.
+23. Every start-action subagent must invoke its role-local skill before acting, and must re-invoke that same role-local skill after compaction if loaded-skill memory is lost.
+24. Empty subagent output is not a result, verdict, blocker, drift evidence, or progress. It means the role thread may have been interrupted before responding. For that empty turn, continue that same role thread with exactly `continue` using the platform's same-thread continuation primitive and do nothing else for that role. Classify the next response fresh: empty output gets another exact `continue`; non-empty invalid output gets full context repair; valid output follows its normal branch.
+25. Non-empty but invalid, malformed, or nonconforming role output is also not progress, but it is a context-repair problem rather than an interruption. Send a full corrective context prompt to that same role thread using the platform's same-thread continuation primitive and the normal subagent prompt contract for that role. Do not switch role threads, self-implement, self-review, dispatch a dependent role, checkpoint, or report progress.
 
 ## Workflow Skeleton
 
@@ -166,7 +167,7 @@ For each task or task-group, follow this loop:
 15. If the adjudication concludes `INSUFFICIENT_EVIDENCE`, append the ledger entry, stop the current scope, and raise an `ADJUDICATION_INSUFFICIENT_EVIDENCE` exception report.
 16. If either reviewer returns blocking findings that do not require adjudication or invalidation, send all findings back to the same implementer.
 17. Repeat until both reviewers converge.
-18. Only then require the implementer to create the checkpoint commit.
+18. Only then require the implementer to create the actual git checkpoint commit.
 19. After the checkpoint commit succeeds, advance to the next scope.
 
 Do not return to the user after one checkpoint. Continue until all scopes are complete.
@@ -285,7 +286,7 @@ Unsupported combination:
 
 - Implementer `TaskGroup`, reviewer `Task`.
 
-Checkpoint commit granularity follows reviewer granularity.
+Checkpoint commit granularity follows reviewer granularity. A checkpoint commit is a real git commit, not a diff snapshot, status report, note, or uncommitted worktree state.
 
 ## Subagent Prompt Contract
 
@@ -363,7 +364,7 @@ Implementer prompts must additionally include:
 - Do not edit the drift adjudication ledger directly. If you think it must change, return evidence and the relevant `DRIFT_ID` for P9 to adjudicate.
 - Before declaring done, compare your diff against the checkpoint baseline and verify alignment with the task requirements.
 - Pass your exact completion claims back so the lead can forward them to both reviewers.
-- Do not create a commit until both reviewers converge.
+- Do not create a commit until both reviewers converge; after both reviewers converge, create the required git checkpoint commit when the controller requests it.
 - If you prove a frozen plan step is unexecutable or spec-drifting, stop and report evidence for P9 adjudication. Do not silently substitute a new route and do not degrade spec compliance just to preserve literal plan alignment.
 - If materially new evidence disproves a relevant non-superseded drift-ledger entry, return plan drift evidence with explicit supersession evidence. Do not silently overrule the ledger.
 
@@ -422,6 +423,7 @@ When this happens, raise an exception report with:
 | "If code matches the spec but not the broken plan, reviewers should force it back to the plan" | No. Return plan drift evidence. P9 adjudicates; do not make spec-correct code worse to preserve a broken plan step. |
 | "Any proven wrong plan step means the workflow must terminate immediately" | No. First run the adjudication loop. Only stop if adjudication cannot establish a safe executable path that still respects the immutable spec. |
 | "I can just paste the adjudication into later prompts instead of writing a ledger entry" | No. Prompt carry-forward is not a durable artifact. Persist every adjudication in the drift ledger before later rounds continue. |
+| "The plan says checkpoint step instead of commit step, so dirty worktree state is enough" | No. In `start-action`, checkpoint commit means an actual git commit at reviewer granularity. The workflow itself authorizes those commits even if derived plan text or generic guidance says commits require explicit user wording. |
 | "If the investigator says spec reconvergence is required, that really means I should fix the plan" | No. `SPEC_RECONVERGENCE_REQUIRED` means the immutable spec must change first. The plan stays derived from that later spec decision. |
 | "The handoff says next steps are to fix reviewer findings, so I should start with debugging or implementation skills" | No. A main agent with dispatch capability must reload `start-action` first; the next steps are P9 workflow state for subagents. |
 | "This is almost done, so I should invoke finishing-a-development-branch" | No. Final review findings, unresolved fixes, or missing regression convergence mean the `start-action` workflow is still active. |
@@ -443,6 +445,7 @@ When this happens, raise an exception report with:
 - Treating a missing `.worktrees/` or `worktrees/` directory as permission to skip manual worktree creation.
 - Letting baseline red tests slide.
 - Allowing commits before both reviewers converge.
+- Skipping required git checkpoint commits after both reviewers converge because the frozen plan or generic workspace guidance says not to commit unless the user explicitly asks.
 - Reusing subagents across different tasks.
 - Letting reviewers modify files.
 - Forgetting the compaction reminder or the original prompt preservation rule.
